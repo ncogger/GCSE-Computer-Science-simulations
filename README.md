@@ -13,6 +13,7 @@ Each simulation is a single self-contained HTML file with no external dependenci
 | `tcp-ip.html` | A message's journey through the 4-layer TCP/IP model: packets, headers, IP addresses, routers, lost and out-of-order packets, HTTP/HTTPS/SMTP/IMAP/POP3/FTP | 4.1.3, 4.1.6–4.1.7 |
 | `sound-sampling.html` | Sampling an analogue sound wave: sample rate, sample interval, bit depth, amplitude levels, playback of the digitised sound, file-size calculations | 2.2.3–2.2.4, 2.3.1 |
 | `bitmap-builder.html` | Pixel editor with each pixel's binary code, colour depth and palettes, decode-the-binary challenges, resolution and colour depth effects on a picture, file-size calculations | 2.2.2, 2.2.4, 2.3.1 |
+| `logic-gates.html` | AND, OR and NOT: live circuits drawn from any expression with up to three inputs, truth tables with working columns, complete-the-table challenges, real-life problems | 1.3.1 |
 
 ## Features shared by every simulation
 
