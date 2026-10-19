@@ -10,6 +10,7 @@ Each simulation is a single self-contained HTML file with no external dependenci
 | `binary-register.html` | Binary ↔ denary, two's complement, binary addition and overflow, logical and arithmetic shifts | 2.1.1–2.1.5 |
 | `sort-search.html` | Bubble sort, merge sort, linear search, binary search, efficiency comparisons | 1.2.6–1.2.7 |
 | `trace-table.html` | Trace tables for Python programs, fill-it-in practice, finding syntax, runtime and logic errors | 1.2.1, 1.2.4–1.2.5 |
+| `tcp-ip.html` | A message's journey through the 4-layer TCP/IP model: packets, headers, IP addresses, routers, lost and out-of-order packets, HTTP/HTTPS/SMTP/IMAP/POP3/FTP | 4.1.3, 4.1.6–4.1.7 |
 
 ## Features shared by every simulation
 
