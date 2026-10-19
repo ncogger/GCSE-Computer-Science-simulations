@@ -22,6 +22,7 @@ Simulations for the Pearson BTEC National in Computing (2025), Unit 2, are in th
 | File | Topic | Spec |
 |---|---|---|
 | `btec-unit2/cipher-lab.html` | Substitution (Caesar and keyword), transposition (rail fence and columnar), XOR, one-time pad (and what goes wrong if a pad is reused), Enigma-style rotor cipher, LSB steganography; step-through algorithms, frequency analysis and brute force, strengths and weaknesses, put-the-algorithm-in-order challenges | C1.5.1 |
+| `btec-unit2/attack-defend.html` | Nine network attacks (eavesdropping, interception, replay, ARP spoofing, DNS poisoning, man-in-the-middle, crypto-jacking, SQL injection, buffer overflow) animated step by step on a network, login form, memory or CPU view, each with a defence toggle that shows the countermeasure stopping it; put-the-attack-in-order and choose-the-defence challenges | B1, B2, B3 |
 
 ## Features shared by every simulation
 
