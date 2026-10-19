@@ -17,6 +17,18 @@ Each simulation is a single self-contained HTML file with no external dependenci
 - **Predict / Challenge** (`Q`): asks pupils what will happen before each step, or sets practice questions.
 - Keyboard and presentation-clicker control (`Space` / `PgDn` to step, `←` / `PgUp` to go back). Press `?` in any simulation for the full list.
 
+## House style
+
+The simulations follow the Computing department's Classroom Resources Style Guide: Lexend headings, Atkinson Hyperlegible Next body text and Atkinson Hyperlegible Mono code, school navy (#001F5B) with a St David's gold (#85764d) accent line, no italics or capitals blocks, and explanation boxes that match the guide's components (Instruction, Key word, Hint, Challenge) by border and icon.
+
+The fonts are embedded in each file so they work offline. To restyle after editing a simulation, run:
+
+```
+python3 tools/apply_house_style.py FONT_DIR
+```
+
+where `FONT_DIR` contains the latin-subset woff2 files from Google Fonts for the three families.
+
 ## Adding to Moodle
 
 1. Turn editing on → Add an activity or resource → **File**.
