@@ -9,6 +9,7 @@ Each simulation is a single self-contained HTML file with no external dependenci
 | `fde-cycle.html` | Fetch–decode–execute cycle, buses, registers, stored program concept, Z80 pinout | 3.1.1 |
 | `binary-register.html` | Binary ↔ denary, two's complement, binary addition and overflow, logical and arithmetic shifts | 2.1.1–2.1.5 |
 | `sort-search.html` | Bubble sort, merge sort, linear search, binary search, efficiency comparisons | 1.2.6–1.2.7 |
+| `trace-table.html` | Trace tables for Python programs, fill-it-in practice, finding syntax, runtime and logic errors | 1.2.1, 1.2.4–1.2.5 |
 
 ## Features shared by every simulation
 
@@ -24,10 +25,10 @@ The simulations follow the Computing department's Classroom Resources Style Guid
 The fonts are embedded in each file so they work offline. To restyle after editing a simulation, run:
 
 ```
-python3 tools/apply_house_style.py FONT_DIR
+python3 tools/apply_house_style.py
 ```
 
-where `FONT_DIR` contains the latin-subset woff2 files from Google Fonts for the three families.
+The fonts are kept in `tools/fonts` (SIL Open Font Licence), so `python3 tools/apply_house_style.py` works with no arguments.
 
 ## Adding to Moodle
 

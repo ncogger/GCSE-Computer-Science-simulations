@@ -1,6 +1,6 @@
 """Apply the Computing department's classroom-resources house style to every simulation.
 
-Usage: python3 tools/apply_house_style.py FONT_DIR
+Usage: python3 tools/apply_house_style.py [FONT_DIR]   (defaults to tools/fonts)
 
 FONT_DIR holds the latin-subset woff2 files for Atkinson Hyperlegible Next,
 Atkinson Hyperlegible Mono and Lexend (all SIL Open Font Licence). They are embedded
@@ -13,7 +13,7 @@ import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SIMS = ['fde-cycle.html', 'binary-register.html', 'sort-search.html']
+SIMS = ['fde-cycle.html', 'binary-register.html', 'sort-search.html', 'trace-table.html']
 
 FONTS = [  # (family, weight range, filename prefix)
     ('Atkinson Hyperlegible Next', '400 700', 'NaPNcYPdHfdVxJw0'),
@@ -145,7 +145,7 @@ def apply(path, faces):
 
 
 if __name__ == '__main__':
-    faces = font_faces(pathlib.Path(sys.argv[1]))
+    faces = font_faces(pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / 'tools' / 'fonts')
     for name in SIMS:
         apply(ROOT / name, faces)
         print('styled', name)
