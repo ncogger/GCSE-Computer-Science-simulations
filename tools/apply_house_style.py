@@ -13,7 +13,7 @@ import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SIMS = ['fde-cycle.html', 'binary-register.html', 'sort-search.html', 'trace-table.html', 'tcp-ip.html', 'sound-sampling.html', 'bitmap-builder.html', 'logic-gates.html', 'btec-unit2/cipher-lab.html', 'btec-unit2/attack-defend.html', 'btec-unit2/keys-lab.html', 'btec-unit2/hash-lab.html', 'btec-unit2/packets-lab.html', 'btec-unit2/raid-lab.html', 'btec-unit2/firewall-lab.html', 'btec-unit2/passwords-lab.html']
+SIMS = ['fde-cycle.html', 'binary-register.html', 'sort-search.html', 'trace-table.html', 'tcp-ip.html', 'sound-sampling.html', 'bitmap-builder.html', 'logic-gates.html', 'btec-unit2/cipher-lab.html', 'btec-unit2/attack-defend.html', 'btec-unit2/keys-lab.html', 'btec-unit2/hash-lab.html', 'btec-unit2/packets-lab.html', 'btec-unit2/raid-lab.html', 'btec-unit2/firewall-lab.html', 'btec-unit2/passwords-lab.html', 'btec-unit2/network-designer.html']
 
 FONTS = [  # (family, weight range, filename prefix)
     ('Atkinson Hyperlegible Next', '400 700', 'NaPNcYPdHfdVxJw0'),
