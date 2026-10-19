@@ -376,7 +376,9 @@ const MINUS = '−';
 const fmt = n => n < 0 ? MINUS + (-n) : String(n);
 
 /* ---------- state ---------- */
-const settings = Object.assign({ tool: 'convert', signed: false, hex: false, presenter: false }, store.get('binSim.v1', {}));
+/* saved settings from an older version may lack newer options: fill gaps from the defaults, one level deep */
+const mergeSaved = (d, s) => { const o = Object.assign({}, d, s && typeof s === 'object' ? s : {}); for (const k in d) { const dv = d[k], sv = o[k]; if (dv && typeof dv === 'object' && !Array.isArray(dv)) o[k] = sv && typeof sv === 'object' && !Array.isArray(sv) ? Object.assign({}, dv, sv) : dv; } return o; };
+const settings = mergeSaved({ tool: 'convert', signed: false, hex: false, presenter: false }, store.get('binSim.v1', {}));
 if (!['convert', 'add', 'shift'].includes(settings.tool)) settings.tool = 'convert';
 const save = () => store.set('binSim.v1', settings);
 

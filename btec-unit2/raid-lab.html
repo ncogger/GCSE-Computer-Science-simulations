@@ -383,7 +383,9 @@ const b8 = n => n.toString(2).padStart(8, '0');
 const hex2 = n => n.toString(16).toUpperCase().padStart(2, '0');
 
 const TOOLS = [{ id: 'r0', name: 'RAID 0' }, { id: 'r1', name: 'RAID 1' }, { id: 'r5', name: 'RAID 5' }, { id: 'r10', name: 'RAID 10' }, { id: 'bk', name: 'Backups' }];
-const settings = Object.assign({
+/* saved settings from an older version may lack newer options: fill gaps from the defaults, one level deep */
+const mergeSaved = (d, s) => { const o = Object.assign({}, d, s && typeof s === 'object' ? s : {}); for (const k in d) { const dv = d[k], sv = o[k]; if (dv && typeof dv === 'object' && !Array.isArray(dv)) o[k] = sv && typeof sv === 'object' && !Array.isArray(sv) ? Object.assign({}, dv, sv) : dv; } return o; };
+const settings = mergeSaved({
   tool: 'r5', presenter: false, speed: 2,
   r0: { failed: [] }, r1: { failed: [] }, r5: { failed: [] }, r10: { failed: [] },
   bk: { type: 'inc' }, cap: { n: 4, size: 2 }

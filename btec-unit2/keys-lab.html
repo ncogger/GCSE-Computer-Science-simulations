@@ -392,7 +392,9 @@ const hex2 = n => n.toString(16).toUpperCase().padStart(2, '0');
 const TOOLS = [
   { id: 'sym', name: 'Symmetric vs asymmetric' }, { id: 'rsa', name: 'RSA' }, { id: 'aes', name: 'AES' }, { id: 'tls', name: 'TLS' }
 ];
-const settings = Object.assign({
+/* saved settings from an older version may lack newer options: fill gaps from the defaults, one level deep */
+const mergeSaved = (d, s) => { const o = Object.assign({}, d, s && typeof s === 'object' ? s : {}); for (const k in d) { const dv = d[k], sv = o[k]; if (dv && typeof dv === 'object' && !Array.isArray(dv)) o[k] = sv && typeof sv === 'object' && !Array.isArray(sv) ? Object.assign({}, dv, sv) : dv; } return o; };
+const settings = mergeSaved({
   tool: 'sym', presenter: false, speed: 2,
   sym: { mode: 'sym', share: 'net', users: 10 },
   rsa: { p: 11, q: 17, e: 7, msg: 'HI' },

@@ -376,7 +376,9 @@ const WAVES = [
 const RATES = [1000, 2000, 4000, 8000, 11025, 16000, 22050, 32000, 44100, 48000];
 const WINDOW = 0.004; // the graph shows 4 milliseconds of sound
 
-const settings = Object.assign({ wave: 0, rate: 3, bits: 3, freq: 500, orig: true, err: false, join: false, dur: 180, ch: 2, presenter: false }, store.get('soundSim.v1', {}));
+/* saved settings from an older version may lack newer options: fill gaps from the defaults, one level deep */
+const mergeSaved = (d, s) => { const o = Object.assign({}, d, s && typeof s === 'object' ? s : {}); for (const k in d) { const dv = d[k], sv = o[k]; if (dv && typeof dv === 'object' && !Array.isArray(dv)) o[k] = sv && typeof sv === 'object' && !Array.isArray(sv) ? Object.assign({}, dv, sv) : dv; } return o; };
+const settings = mergeSaved({ wave: 0, rate: 3, bits: 3, freq: 500, orig: true, err: false, join: false, dur: 180, ch: 2, presenter: false }, store.get('soundSim.v1', {}));
 const save = () => store.set('soundSim.v1', settings);
 let lastKind = null, sel = null, chal = { on: false, q: null, answered: false, chosen: null, right: 0, total: 0 };
 

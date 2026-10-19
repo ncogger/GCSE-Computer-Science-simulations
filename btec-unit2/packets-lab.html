@@ -505,7 +505,9 @@ function v4kind(o) {
 function macParse(s) { const t = String(s).trim().toLowerCase().replace(/-/g, ':'); return /^([0-9a-f]{2}:){5}[0-9a-f]{2}$/.test(t) ? t.split(':').map(x => parseInt(x, 16)) : null; }
 
 const TOOLS = [{ id: 'anat', name: 'Packet anatomy' }, { id: 'switch', name: 'Packet switching' }, { id: 'addr', name: 'IP and MAC' }, { id: 'proto', name: 'Protocols' }];
-const settings = Object.assign({
+/* saved settings from an older version may lack newer options: fill gaps from the defaults, one level deep */
+const mergeSaved = (d, s) => { const o = Object.assign({}, d, s && typeof s === 'object' ? s : {}); for (const k in d) { const dv = d[k], sv = o[k]; if (dv && typeof dv === 'object' && !Array.isArray(dv)) o[k] = sv && typeof sv === 'object' && !Array.isArray(sv) ? Object.assign({}, dv, sv) : dv; } return o; };
+const settings = mergeSaved({
   tool: 'anat', presenter: false, speed: 2,
   anat: { proto: 'tcp', data: 'GET /login?user=amy&pw=sunshine HTTP/1.1' },
   switch: { proto: 'tcp' },

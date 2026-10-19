@@ -355,7 +355,7 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const isL = c => c >= 'A' && c <= 'Z';
-const lettersOnly = s => s.toUpperCase().replace(/[^A-Z]/g, '');
+const lettersOnly = s => String(s == null ? '' : s).toUpperCase().replace(/[^A-Z]/g, '');
 const b8 = n => n.toString(2).padStart(8, '0');
 const hex2 = n => n.toString(16).toUpperCase().padStart(2, '0');
 
@@ -367,7 +367,9 @@ const TOOLS = [
   { id: 'sub', name: 'Substitution' }, { id: 'trans', name: 'Transposition' }, { id: 'xor', name: 'XOR' },
   { id: 'otp', name: 'One-time pad' }, { id: 'rotor', name: 'Rotor' }, { id: 'steg', name: 'Steganography' }
 ];
-const settings = Object.assign({
+/* saved settings from an older version may lack newer options: fill gaps from the defaults, one level deep */
+const mergeSaved = (d, s) => { const o = Object.assign({}, d, s && typeof s === 'object' ? s : {}); for (const k in d) { const dv = d[k], sv = o[k]; if (dv && typeof dv === 'object' && !Array.isArray(dv)) o[k] = sv && typeof sv === 'object' && !Array.isArray(sv) ? Object.assign({}, dv, sv) : dv; } return o; };
+const settings = mergeSaved({
   tool: 'sub', presenter: false, speed: 2, dec: false,
   sub: { variant: 'caesar', msg: 'MEET ME AT THE OLD BRIDGE', shift: 3, keyword: 'DRAGON' },
   trans: { variant: 'rail', msg: 'WE ARE DISCOVERED FLEE AT ONCE', rails: 3, keyword: 'ZEBRA' },

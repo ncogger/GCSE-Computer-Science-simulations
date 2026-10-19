@@ -398,7 +398,9 @@ const SCEN = [
 
 /* ---------- settings ---------- */
 const SPEEDS = [0.5, 1, 2, 3, 5];
-const settings = Object.assign({ sc: 0, proto: {}, conn: 'Wi-Fi', text: {}, lose: false, predict: false, presenter: false, speed: 1 }, store.get('tcpSim.v1', {}));
+/* saved settings from an older version may lack newer options: fill gaps from the defaults, one level deep */
+const mergeSaved = (d, s) => { const o = Object.assign({}, d, s && typeof s === 'object' ? s : {}); for (const k in d) { const dv = d[k], sv = o[k]; if (dv && typeof dv === 'object' && !Array.isArray(dv)) o[k] = sv && typeof sv === 'object' && !Array.isArray(sv) ? Object.assign({}, dv, sv) : dv; } return o; };
+const settings = mergeSaved({ sc: 0, proto: {}, conn: 'Wi-Fi', text: {}, lose: false, predict: false, presenter: false, speed: 1 }, store.get('tcpSim.v1', {}));
 if (!(settings.sc >= 0 && settings.sc < SCEN.length)) settings.sc = 0;
 const save = () => store.set('tcpSim.v1', settings);
 const SC = () => SCEN[settings.sc];
