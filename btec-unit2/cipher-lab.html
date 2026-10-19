@@ -131,6 +131,10 @@ table.g td.rowh{font-family:var(--sans);font-size:.75rem;font-weight:800;color:v
 .rotor .nm{font-size:.75rem;color:var(--muted);font-weight:800}
 .rotor .ud{display:flex;gap:.15rem;justify-content:center;margin-top:.2rem}
 .rotor .ud button{min-height:1.6rem;padding:0 .4rem}
+.rotorrow{display:flex;flex-wrap:wrap;gap:.6rem 2rem;margin-top:.5rem;align-items:flex-start}
+.rotor .setw{width:2.6rem;height:2.6rem;border:2px dashed var(--muted);border-radius:.4rem;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:1.3rem;font-weight:800;margin:0 auto;background:#fff}
+.rotor .win.turned{background:var(--hi);box-shadow:0 0 0 3px var(--cur-edge)}
+.rotor .notch{font-size:.68rem;font-weight:700;color:var(--muted);margin-top:.2rem;min-height:1.6rem}
 .path{display:flex;flex-wrap:wrap;gap:.25rem;align-items:center;font-family:var(--mono);margin-top:.6rem}
 .path .p{border:2px solid var(--ink);border-radius:.35rem;padding:.1rem .45rem;font-weight:800;background:#fff;text-align:center}
 .path .p small{display:block;font-family:var(--sans);font-size:.62rem;font-weight:700}
@@ -658,17 +662,17 @@ const REFL = 'YRUHQSLDPXNGOKMIEBFZCWVJAT';
 function traceRotor(s, dec) {
   const msg = lettersOnly(s.msg), start = (lettersOnly(s.start) + 'AAA').slice(0, 3), p = [...start].map(c => A.indexOf(c)), steps = [];
   let out = '';
-  const push = (line, note, x) => steps.push(Object.assign({ line: [line], note, msg, out, pos: p.map(x => A[x]).join('') }, x));
+  const push = (line, note, x) => steps.push(Object.assign({ line: [].concat(line), note, msg, out, pos: p.map(x => A[x]).join(''), start }, x));
   push(1, `Input the ${dec ? 'ciphertext' : 'message'}: <code>${msg}</code>.`, { i: -1 });
   push(2, `Set the rotors to <b>${start}</b>.`, { i: -1 });
   for (let i = 0; i < msg.length; i++) {
     if (i === 0) push(3, `First letter: <b>${msg[0]}</b>.`, { i });
     const mid = p[1] === A.indexOf(ROT[1][1]), right = p[2] === A.indexOf(ROT[2][1]);
-    let turned = 'the right-hand rotor turns';
-    if (mid) { p[0] = (p[0] + 1) % 26; p[1] = (p[1] + 1) % 26; turned = 'the right rotor turns, and the middle rotor is at its notch so it turns the left rotor too'; }
-    else if (right) { p[1] = (p[1] + 1) % 26; turned = 'the right rotor reaches its notch, so the middle rotor turns too'; }
+    let turned = 'the right-hand rotor (III) turns one place', moved = [2];
+    if (mid) { p[0] = (p[0] + 1) % 26; p[1] = (p[1] + 1) % 26; turned = `the right-hand rotor turns, and the middle rotor is sitting at its notch (${ROT[1][1]}), so it turns <b>and</b> pushes the left rotor round too – the famous “double step”`; moved = [0, 1, 2]; }
+    else if (right) { p[1] = (p[1] + 1) % 26; turned = `the right-hand rotor turns, and because it was at its notch (${ROT[2][1]}) it pushes the middle rotor round one place too`; moved = [1, 2]; }
     p[2] = (p[2] + 1) % 26;
-    push(4, `Before the letter is encrypted, ${turned}. Rotors now show <b>${p.map(x => A[x]).join('')}</b>.`, { i, turned: true });
+    push(4, `Before the letter is encrypted, ${turned}. The windows now show <b>${p.map(x => A[x]).join('')}</b>.`, { i, moved });
     const path = [msg[i]]; let c = A.indexOf(msg[i]);
     for (let r = 2; r >= 0; r--) { c = (A.indexOf(ROT[r][0][(c + p[r]) % 26]) - p[r] + 26) % 26; path.push(A[c]); }
     push(5, `Through the rotors right to left: ${path.join(' → ')}.`, { i, path: path.slice(), stage: 1 });
@@ -678,17 +682,22 @@ function traceRotor(s, dec) {
     push(7, `Back through the rotors left to right: ${path.slice(4).join(' → ')}.`, { i, path: path.slice(), stage: 3 });
     out += A[c];
     push(8, `Record <b>${A[c]}</b>.`, { i, path: path.slice(), stage: 3 });
-    push(9, 'Move on to the next letter.', { i, path: path.slice(), stage: 3 });
+    if (i < msg.length - 1) push([9, 11], `Move on to the next letter, <b>${msg[i + 1]}</b>, and go back to instruction 4.`, { i: i + 1, path: path.slice(), stage: 3 });
+    else push(9, 'That was the last letter.', { i, path: path.slice(), stage: 3 });
   }
   push(10, `No more letters. ${dec ? 'Plaintext' : 'Ciphertext'}: <b>${out}</b>. Notice repeated letters do not always give the same output.`, { i: -1, done: true });
   return steps;
 }
 function renderRotor(st, s, dec) {
-  const pos = st.pos;
+  const pos = st.pos, start = st.start, moved = st.moved || [];
   let h = `<div class="lbl">${dec ? 'Ciphertext' : 'Message'}</div>${strip(st.msg, st.i, st.done)}
-    <div class="lbl" style="margin-top:.7rem">Rotors (left to right: ${ROT.map(r => r[2]).join(', ')}) – starting positions set below</div>
-    <div class="rotors">${[0, 1, 2].map(r => `<div class="rotor"><div class="nm">Rotor ${ROT[r][2]}</div><div class="win">${pos[r]}</div><div class="ud"><button class="btn small" data-rot="${r}" data-d="-1" aria-label="Rotor ${ROT[r][2]} back">−</button><button class="btn small" data-rot="${r}" data-d="1" aria-label="Rotor ${ROT[r][2]} forward">+</button></div></div>`).join('')}
-    <div class="rotor"><div class="nm">Reflector</div><div class="win" style="background:#eef0f4">B</div><div class="ud" style="height:1.8rem"></div></div></div>`;
+    <div class="rotorrow">
+      <div><div class="lbl">Start position (the key)</div>
+        <div class="rotors">${[0, 1, 2].map(r => `<div class="rotor"><div class="nm">Rotor ${ROT[r][2]}</div><div class="setw">${start[r]}</div><div class="ud"><button class="btn small" data-rot="${r}" data-d="-1" aria-label="Rotor ${ROT[r][2]} start back">−</button><button class="btn small" data-rot="${r}" data-d="1" aria-label="Rotor ${ROT[r][2]} start forward">+</button></div></div>`).join('')}</div></div>
+      <div><div class="lbl">Rotor windows now</div>
+        <div class="rotors">${[0, 1, 2].map(r => `<div class="rotor"><div class="nm">Rotor ${ROT[r][2]}</div><div class="win${moved.includes(r) ? ' turned' : ''}">${pos[r]}</div><div class="notch">${moved.includes(r) ? '↻ turned' : `notch ${ROT[r][1]}`}</div></div>`).join('')}
+        <div class="rotor"><div class="nm">Reflector</div><div class="win" style="background:#eef0f4">B</div><div class="notch">fixed</div></div></div></div>
+    </div>`;
   if (st.path) {
     const L = ['Key', 'Rotor III', 'Rotor II', 'Rotor I', 'Reflector', 'Rotor I', 'Rotor II', 'Rotor III'];
     h += `<div class="path">${st.path.map((c, k) => `${k ? '<span class="ar">→</span>' : ''}<span class="p${k === 7 ? ' end' : ''}">${c}<small>${L[k]}</small></span>`).join('')}</div>`;
@@ -942,7 +951,7 @@ stage.addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.dir != null) { settings.dec = b.dataset.dir === '1'; save(); rebuild(false); return; }
   if (b.dataset.var) { S().variant = b.dataset.var; save(); rebuild(); return; }
-  if (b.dataset.rot != null) { const s = settings.rotor, p = (lettersOnly(s.start) + 'AAA').slice(0, 3).split(''); const r = +b.dataset.rot; p[r] = A[(A.indexOf(p[r]) + +b.dataset.d + 26) % 26]; s.start = p.join(''); save(); rebuild(); return; }
+  if (b.dataset.rot != null) { const s = settings.rotor, p = (lettersOnly(s.start) + 'AAA').slice(0, 3).split(''); const r = +b.dataset.rot; p[r] = A[(A.indexOf(p[r]) + +b.dataset.d + 26) % 26]; s.start = p.join(''); save(); rebuild(false); return; }
   if (b.dataset.mv != null) { const pos = +b.dataset.mv, d = +b.dataset.d, o = chal.order; [o[pos], o[pos + d]] = [o[pos + d], o[pos]]; renderStage(); const nb = stage.querySelector(`[data-mv="${pos + d}"][data-d="${d}"]`); if (nb && !nb.disabled) nb.focus(); return; }
   const act = b.dataset.act;
   if (act === 'newkey') { settings.otp.key = randomKey(Math.max(20, lettersOnly(settings.otp.msg).length)); save(); rebuild(); }
@@ -960,7 +969,7 @@ stage.addEventListener('change', e => {
   let v = e.target.value;
   if (k === 'shift') v = Math.max(1, Math.min(25, Math.round(+v) || 1));
   if (k === 'rails') v = Math.max(2, Math.min(6, Math.round(+v) || 3));
-  S()[k] = v; save(); rebuild();
+  S()[k] = v; save(); rebuild(k !== 'start');
 });
 stage.addEventListener('toggle', e => { if (e.target.id === 'crack') settings.crackOpen = e.target.open; }, true);
 stage.addEventListener('keydown', e => { if (e.target.dataset && e.target.dataset.k && e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
