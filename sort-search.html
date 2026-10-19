@@ -1,0 +1,890 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sorting and Searching</title>
+<style>
+:root{
+  --bg:#eef1f6; --surface:#ffffff; --surface2:#f6f7fa; --ink:#151a26; --muted:#56607a; --line:#d3d8e3;
+  --accent:#0d6b67; --accent-soft:#e2f2f0;
+  --cmp:#ffd84d; --swap:#f08a24; --bar:#c3cbdb; --disc:#e6e9f0;
+  --low:#1f5fd6; --mid:#b45309; --high:#8b3bd4;
+  --hexc:#c25a00; --data-soft:#fdeedc;
+  --ok:#14713f; --ok-soft:#dff3e6; --bad:#b42318; --bad-soft:#fde4e1;
+  --mono:ui-monospace,"Cascadia Mono","Consolas","Menlo","DejaVu Sans Mono",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mc:2.15rem; --bh:15rem;
+}
+html{font-size:15px}
+html.presenter{font-size:clamp(13px,min(1.85vh,1.05vw),32px)}
+html.presenter body{height:100vh;display:flex;flex-direction:column;overflow:hidden}
+html.presenter .layout{flex:1;min-height:0;overflow:auto;width:100%;align-content:center}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.45}
+button,select,input{font:inherit;color:inherit}
+kbd{font-family:var(--mono);font-size:.85em;border:1px solid var(--line);border-bottom-width:2px;border-radius:.3rem;padding:0 .3rem;background:var(--surface);color:var(--ink)}
+code{font-family:var(--mono)}
+h2{font-size:1.15rem;margin:.2rem 0 .6rem}
+h3{font-size:1rem;margin:1.2rem 0 .4rem}
+small{font-weight:400;color:var(--muted)}
+
+/* ---------- top bar ---------- */
+.topbar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .9rem;padding:.55rem 1rem;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:30}
+.brand{display:flex;flex-direction:column;line-height:1.15;margin-right:.3rem}
+.brand h1{font-size:1.15rem;margin:0}
+.brand span{font-size:.75rem;color:var(--muted)}
+.group{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:.5rem;padding:.35rem .7rem;min-height:2.3rem;cursor:pointer;font-size:.9rem;white-space:nowrap}
+.btn:hover{background:var(--surface2)}
+.btn:focus-visible,.tab:focus-visible,.seg button:focus-visible,.opt:focus-visible{outline:3px solid #1f5fd6;outline-offset:2px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.btn.primary:hover{background:#0a5753}
+.btn[disabled]{opacity:.4;cursor:default}
+.btn[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.btn.icon{min-width:2.3rem;padding:.35rem .5rem}
+.spacer{flex:1}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:.55rem;overflow:hidden;background:var(--surface);flex-wrap:wrap}
+.seg button{border:0;border-right:1px solid var(--line);background:transparent;padding:.4rem .75rem;cursor:pointer;font-weight:700;color:var(--muted);min-height:2.3rem;white-space:nowrap}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+label.field{display:flex;align-items:center;gap:.4rem;font-size:.85rem;color:var(--muted)}
+select,.inp{border:1px solid var(--line);border-radius:.5rem;padding:.3rem .5rem;background:var(--surface);min-height:2.2rem}
+.inp{width:4.5rem;font-family:var(--mono)}
+input[type=range]{accent-color:var(--accent);width:6rem}
+#speedLabel{min-width:5.6rem;color:var(--ink)}
+
+/* ---------- layout ---------- */
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 26rem;gap:1rem;padding:1rem;max-width:112rem;margin:0 auto;align-items:start}
+@media (max-width:1240px){.layout{grid-template-columns:minmax(0,1fr)}}
+html.presenter .layout{grid-template-columns:minmax(0,1fr);max-width:none;padding:.8rem 1.2rem}
+html.presenter #panel,html.presenter .rev-only{display:none!important}
+.stage{background:var(--surface);border:2px solid var(--ink);border-radius:.9rem;padding:1rem 1.2rem 1.2rem;min-width:0}
+html.presenter .stage{border-width:3px;max-width:100rem;margin:0 auto;width:100%}
+.tool-head{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.6rem;margin-bottom:.9rem}
+.tool-head h2{margin:0;font-size:1.3rem}
+.tool-head .sub{color:var(--muted);font-size:.85rem}
+.data-ctl{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
+
+/* ---------- bars (bubble sort) ---------- */
+.bars{position:relative;height:var(--bh);border-bottom:3px solid var(--ink);margin:0 auto .3rem;max-width:56rem}
+.bars.compact{height:9rem}
+.bar{position:absolute;bottom:0;background:var(--bar);border-radius:.45rem .45rem 0 0;display:flex;align-items:flex-start;justify-content:center;padding-top:.25rem;font-family:var(--mono);font-weight:800;font-size:1.05rem;color:var(--ink);transition:left .38s ease-in-out,background .2s,height .38s}
+.bars.compact .bar{font-size:.8rem}
+.bar.cmp{background:var(--cmp)}
+.bar.swap{background:var(--swap);color:#fff}
+.bar.done{background:var(--accent);color:#fff}
+.legend{display:flex;gap:.3rem 1rem;justify-content:center;flex-wrap:wrap;font-size:.8rem;color:var(--muted);margin:.4rem 0 0}
+.sw{display:inline-block;width:.85rem;height:.85rem;border-radius:.2rem;vertical-align:-.12em;margin-right:.3rem}
+
+/* ---------- cards (searching) ---------- */
+.target{text-align:center;font-size:1.15rem;margin:.2rem 0 .6rem}
+.target b{font-family:var(--mono);font-size:1.35rem;background:var(--cmp);padding:0 .45rem;border-radius:.35rem}
+.cards{display:flex;gap:.28rem;justify-content:center;container-type:inline-size;width:100%}
+.card{flex:1 1 0;max-width:4rem;min-width:0;display:flex;flex-direction:column;align-items:center;cursor:pointer;transition:opacity .25s}
+.cv{width:100%;aspect-ratio:.82;border:2px solid var(--ink);border-radius:.45rem;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:800;font-size:clamp(.55rem,calc(62cqi / var(--n)),1.45rem);background:var(--surface);transition:background .2s}
+.idx{font-family:var(--mono);font-size:clamp(.5rem,calc(40cqi / var(--n)),.85rem);color:var(--muted);margin-top:.15rem}
+.ptrs{height:3.3rem;display:flex;flex-direction:column-reverse;align-items:center;justify-content:flex-start;gap:.12rem}
+.ptr{font-size:clamp(.5rem,calc(36cqi / var(--n)),.78rem);font-weight:800;color:#fff;border-radius:.25rem;padding:0 .25rem;line-height:1.35;white-space:nowrap}
+.p-low{background:var(--low)} .p-mid{background:var(--mid)} .p-high{background:var(--high)} .p-i{background:var(--mid)}
+.card.disc{opacity:.28}
+.card.disc .cv{background:var(--disc);border-color:#9aa3b5}
+.card.chk .cv{background:var(--cmp)}
+.card.seen .cv{background:var(--disc);color:var(--muted);border-color:#9aa3b5}
+.card.found .cv{background:var(--accent);color:#fff;border-color:var(--accent)}
+.range-bar{position:relative;height:.45rem;margin:.35rem auto 0;max-width:100%}
+
+/* ---------- merge rows ---------- */
+.mrows{display:flex;flex-direction:column;gap:.4rem;overflow-x:auto;padding:.2rem 0}
+.mrow{display:flex;align-items:center;gap:.6rem;min-width:max-content;margin:0 auto}
+.mlab{width:4.6rem;flex:none;font-size:.7rem;font-weight:800;color:var(--muted);text-align:right;text-transform:uppercase;letter-spacing:.04em}
+.mlab.merge{color:var(--accent)}
+.mgroups{display:flex;gap:.9rem;justify-content:center}
+.mg{display:flex;gap:.15rem;padding:.15rem;border-radius:.45rem;border:1.5px solid var(--line);background:var(--surface2)}
+.mg.active{border-color:#c9a20f;background:#fff6cc;box-shadow:0 0 0 2px #ffe680}
+.mg.done{border-color:var(--accent)}
+.mc{width:var(--mc);height:var(--mc);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:800;border-radius:.3rem;background:var(--surface);border:1.5px solid var(--ink);font-size:calc(var(--mc)*.45)}
+.mc.slot{border-style:dashed;border-color:#b7bfcd;background:transparent}
+.mc.moved{background:var(--cmp)}
+.mc.front{background:var(--cmp)}
+.mc.fin{background:var(--accent);color:#fff;border-color:var(--accent)}
+.work{display:flex;gap:.6rem 1.4rem;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:.8rem;padding:.6rem .8rem;border:2px dashed #c9a20f;border-radius:.7rem;background:#fffbea}
+.work .wl{font-size:.72rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.15rem}
+.work .wg{display:flex;gap:.15rem;min-height:var(--mc)}
+.work .arrow{font-size:1.4rem;color:var(--muted)}
+
+/* ---------- counters & code ---------- */
+.lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:1rem;margin-top:1rem;align-items:start}
+.lower.nocode{grid-template-columns:1fr}
+@media (max-width:820px){.lower{grid-template-columns:1fr}}
+.counters{display:flex;flex-wrap:wrap;gap:.5rem}
+.counter{flex:1 1 7rem;border:1.5px solid var(--line);border-radius:.6rem;padding:.45rem .65rem;background:var(--surface2)}
+.counter .cl{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.counter .cn{font-family:var(--mono);font-size:1.7rem;font-weight:800;line-height:1.15}
+.counter .cn small{font-size:.8rem}
+.counter.bump .cn{animation:bump .5s ease-out}
+@keyframes bump{0%{color:var(--accent);transform:scale(1.15)}100%{transform:scale(1)}}
+.codebox{border:1.5px solid var(--line);border-radius:.6rem;background:#fbfbfd;overflow:auto;max-height:24rem;position:relative}
+html.presenter .codebox{max-height:13.5rem}
+.codebox .ch{position:sticky;top:0;background:#fbfbfd;z-index:1}
+.codebox .ch{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:.35rem .7rem;border-bottom:1px solid var(--line);display:flex;justify-content:space-between}
+.codebox pre{margin:0;padding:.35rem 0;font-family:var(--mono);font-size:.84rem;line-height:1.5}
+.ln{display:block;padding:0 .7rem 0 .4rem;border-left:4px solid transparent;white-space:pre}
+.ln .no{display:inline-block;width:1.6rem;color:#a2a9b8;user-select:none}
+.ln.on{background:#fff1a8;border-left-color:#c9a20f}
+.kw{color:#8b3bd4;font-weight:700} .fn{color:#1f5fd6} .cm{color:#7a8396;font-style:italic} .nu{color:#b45309}
+
+/* ---------- compare ---------- */
+.panes{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+@media (max-width:900px){.panes{grid-template-columns:1fr}}
+.pane{border:2px solid var(--line);border-radius:.8rem;padding:.7rem .8rem;min-width:0}
+.pane.winner{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.pane h3{margin:0 0 .5rem;display:flex;justify-content:space-between;align-items:center;gap:.4rem;flex-wrap:wrap}
+.pane .status{font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.pane .status.fin{color:var(--accent)}
+.pane .cards{--n:10}
+.pane .ptrs{height:2.6rem}
+.pane .mrows .mlab{display:none}
+.race-note{text-align:center;color:var(--muted);font-size:.9rem;margin:0 0 .8rem}
+.verdict{text-align:center;margin-top:1rem;font-size:1.1rem}
+.okbox{display:inline-block;background:var(--ok-soft);border:2px solid var(--ok);color:#0d4a29;border-radius:.6rem;padding:.45rem .9rem;font-weight:700}
+
+/* ---------- dock ---------- */
+#dock{position:sticky;bottom:0;z-index:25;background:var(--ink);color:#fff;padding:.7rem 1.1rem;font-size:1rem;min-height:3.6rem;display:flex;flex-direction:column;justify-content:center;gap:.45rem;box-shadow:0 -4px 14px rgba(0,0,0,.15)}
+html.presenter #dock{font-size:1.2rem;padding:.8rem 1.6rem}
+.badge{display:inline-block;font-size:.75em;font-weight:800;text-transform:uppercase;letter-spacing:.05em;background:var(--accent);color:#fff;border-radius:.35rem;padding:.1rem .45rem;margin-right:.45rem;vertical-align:.1em;white-space:nowrap}
+.badge.predict{background:#f2b705;color:#1b1b1b}
+.badge.done{background:var(--ok)}
+.opts{display:flex;flex-wrap:wrap;gap:.45rem}
+.opt{border:2px solid #fff;background:transparent;color:#fff;border-radius:.5rem;padding:.3rem .9rem;cursor:pointer;font-weight:700}
+.opt:hover{background:rgba(255,255,255,.12)}
+.opt.right{background:#1f9d57;border-color:#1f9d57}
+.opt.wrong{background:#c0392b;border-color:#c0392b}
+.opt.dim{opacity:.5}
+.fb .mark{font-weight:800;margin-right:.3rem}
+.fb.ok .mark{color:#7ee2a8} .fb.bad .mark{color:#ffb4a8}
+.dock-hint{font-size:.8em;color:#b8c0d4}
+.dock-hint .btn{color:var(--ink);min-height:1.9rem;padding:.15rem .6rem;margin-left:.3rem}
+#dock code{background:rgba(255,255,255,.12);padding:0 .3rem;border-radius:.25rem}
+
+/* ---------- side panel ---------- */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:.9rem;position:sticky;top:4.6rem;max-height:calc(100vh - 10rem);overflow:auto}
+@media (max-width:1240px){.panel{position:static;max-height:none}}
+.tabs{display:flex;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface);z-index:2;border-radius:.9rem .9rem 0 0}
+.tab{flex:1;border:0;background:transparent;padding:.7rem .4rem;cursor:pointer;font-weight:700;color:var(--muted);border-bottom:3px solid transparent}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tabpanel{padding:.9rem 1.1rem 1.2rem;font-size:.95rem}
+.tabpanel p{margin:.45rem 0}
+.tabpanel ul,.tabpanel ol{padding-left:1.25rem;margin:.4rem 0}
+.tabpanel li{margin:.2rem 0}
+.tip{border-left:4px solid var(--accent);background:var(--accent-soft);padding:.55rem .75rem;border-radius:.4rem;margin:.8rem 0}
+.tip.exam{border-left-color:var(--hexc);background:var(--data-soft)}
+.tip.now{border-left-color:#c9a20f;background:#fff8d6}
+.tip-title{display:block;font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.15rem}
+.tbl{width:100%;border-collapse:collapse;font-size:.86rem;margin:.4rem 0}
+.tbl th,.tbl td{border:1px solid var(--line);padding:.28rem .45rem;text-align:left;vertical-align:top}
+.tbl th{background:var(--surface2)}
+.tbl td.m{font-family:var(--mono);text-align:right}
+.q{border:1px solid var(--line);border-radius:.6rem;padding:.65rem .75rem;margin:.6rem 0}
+.q p{margin:0 0 .45rem;font-weight:700}
+.qopts{display:flex;flex-direction:column;gap:.3rem}
+.qopt{text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:.45rem;padding:.35rem .6rem;cursor:pointer}
+.qopt:hover{background:var(--surface2)}
+.qopt.right{background:var(--ok-soft);border-color:var(--ok);font-weight:700}
+.qopt.wrong{background:var(--bad-soft);border-color:var(--bad)}
+.qwhy{font-size:.88rem;margin-top:.4rem;color:var(--muted)}
+
+dialog{border:0;border-radius:.9rem;padding:1.1rem 1.3rem;max-width:min(36rem,calc(100vw - 2rem));box-shadow:0 12px 40px rgba(0,0,0,.3);color:var(--ink);background:var(--surface)}
+dialog::backdrop{background:rgba(15,20,30,.45)}
+dialog h2{margin-top:0}
+dialog menu{display:flex;justify-content:flex-end;gap:.5rem;padding:0;margin:1rem 0 0}
+.keys{width:100%;border-collapse:collapse;font-size:.9rem}
+.keys td{padding:.25rem .3rem;border-bottom:1px solid var(--line)}
+.keys td:first-child{white-space:nowrap;width:40%}
+
+html.presenter .topbar{font-size:.82rem;padding:.4rem 1.2rem}
+html.presenter .brand span{display:none}
+html.presenter{--bh:17rem}
+@media (max-width:600px){
+  :root{--mc:1.35rem;--bh:11rem}
+  .topbar{padding:.5rem .75rem}
+  .layout{padding:.6rem}
+  .stage{padding:.8rem .7rem 1rem}
+  .bar{font-size:.72rem}
+  .mgroups{gap:.4rem}
+  .mlab{width:2.8rem;font-size:.55rem}
+  .btn .lbl{display:none}
+}
+@media (prefers-reduced-motion:reduce){.bar{transition:none}.counter.bump .cn{animation:none}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><h1>Sorting &amp; searching</h1><span>GCSE Computer Science · Edexcel 1.2.6–1.2.7</span></div>
+  <div class="seg tools" role="group" aria-label="Choose an algorithm">
+    <button data-tool="bubble" title="Bubble sort (1)">Bubble sort</button>
+    <button data-tool="merge" title="Merge sort (2)">Merge sort</button>
+    <button data-tool="linear" title="Linear search (3)">Linear search</button>
+    <button data-tool="binary" title="Binary search (4)">Binary search</button>
+    <button data-tool="compare" title="Race two algorithms (5)">Compare</button>
+  </div>
+  <div class="group" role="group" aria-label="Step controls">
+    <button class="btn" id="btnBack" title="Back one step (←)">◀ <span class="lbl">Back</span></button>
+    <button class="btn primary" id="btnStep" title="Next step (Space)"><span class="lbl">Step</span> ▶</button>
+    <button class="btn" id="btnRun" title="Run or pause (G)">▶ <span class="lbl">Run</span></button>
+    <button class="btn" id="btnReset" title="Back to the start (R)">↺ <span class="lbl">Reset</span></button>
+  </div>
+  <label class="field">Speed <input type="range" id="speed" min="0" max="4" step="1"><span id="speedLabel"></span></label>
+  <div class="spacer"></div>
+  <div class="group" role="group" aria-label="Options">
+    <button class="btn" id="tgPredict" aria-pressed="false" title="Predict each comparison (Q)">Predict</button>
+    <button class="btn" id="tgCode" aria-pressed="true" title="Show the Python code (C)">Code</button>
+    <button class="btn" id="tgMode" aria-pressed="false" title="Revision / presenter mode (P)">Presenter mode</button>
+    <button class="btn icon" id="btnFull" title="Full screen (F)" aria-label="Full screen">⛶</button>
+    <button class="btn icon" id="btnHelp" title="Help and shortcuts (?)" aria-label="Help">?</button>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="stage" id="stage"></section>
+  <aside class="panel" id="panel" aria-label="Explanation">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="t-how" aria-selected="true" aria-controls="p-how">How it works</button>
+      <button class="tab" role="tab" id="t-ideas" aria-selected="false" aria-controls="p-ideas">Key ideas</button>
+      <button class="tab" role="tab" id="t-quiz" aria-selected="false" aria-controls="p-quiz">Check yourself</button>
+    </div>
+    <div class="tabpanel" role="tabpanel" id="p-how" aria-labelledby="t-how"></div>
+    <div class="tabpanel" role="tabpanel" id="p-ideas" aria-labelledby="t-ideas" hidden></div>
+    <div class="tabpanel" role="tabpanel" id="p-quiz" aria-labelledby="t-quiz" hidden></div>
+  </aside>
+</main>
+
+<div id="dock" aria-live="polite"></div>
+
+<dialog id="helpDlg">
+  <h2>How to use this simulation</h2>
+  <p>Pick an algorithm, then step through it one comparison at a time. The counters show how much work it is doing, and the code shows which line is running.</p>
+  <ul>
+    <li><b>Compare</b> races two algorithms on the same data, one comparison per tick.</li>
+    <li><b>Predict</b> asks you what will happen at each comparison before it is shown.</li>
+    <li>In the searches, click any card to search for that value.</li>
+    <li><b>Presenter mode</b> hides the explanations and makes everything bigger.</li>
+  </ul>
+  <table class="keys">
+    <tr><td><kbd>Space</kbd> <kbd>→</kbd> <kbd>PgDn</kbd></td><td>Next step (or reveal / continue in Predict)</td></tr>
+    <tr><td><kbd>←</kbd> <kbd>PgUp</kbd></td><td>Back one step</td></tr>
+    <tr><td><kbd>G</kbd></td><td>Run / pause</td></tr>
+    <tr><td><kbd>R</kbd></td><td>Back to the start</td></tr>
+    <tr><td><kbd>D</kbd></td><td>New data</td></tr>
+    <tr><td><kbd>1</kbd>–<kbd>5</kbd></td><td>Choose an algorithm</td></tr>
+    <tr><td><kbd>Q</kbd></td><td>Predict on / off</td></tr>
+    <tr><td><kbd>C</kbd></td><td>Code on / off</td></tr>
+    <tr><td><kbd>P</kbd></td><td>Presenter / revision mode</td></tr>
+    <tr><td><kbd>F</kbd></td><td>Full screen</td></tr>
+  </table>
+  <p style="font-size:.85rem;color:var(--muted)">Click once on the page first so it receives key presses. A presentation clicker’s PgDn / PgUp buttons also work.</p>
+  <form method="dialog"><menu><button class="btn primary">Close</button></menu></form>
+</dialog>
+
+<noscript><p style="padding:1rem">This simulation needs JavaScript to run.</p></noscript>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const clone = o => JSON.parse(JSON.stringify(o));
+const vals = a => a.map(o => o.v).join(', ');
+const log2c = n => Math.floor(Math.log2(n)) + 1;
+function opts(correct, others) {
+  const out = [String(correct)];
+  for (const o of others) { if (o == null) continue; const s = String(o); if (!out.includes(s) && out.length < 4) out.push(s); }
+  return shuffle(out);
+}
+
+/* ---------- Python code shown beside each algorithm ---------- */
+const CODE = {
+  bubble: ['def bubble_sort(items):', '    n = len(items)', '    swapped = True', '    while swapped:', '        swapped = False', '        for i in range(n - 1):',
+    '            if items[i] > items[i + 1]:', '                temp = items[i]', '                items[i] = items[i + 1]', '                items[i + 1] = temp',
+    '                swapped = True', '        n = n - 1'],
+  merge: ['def merge_sort(items):', '    if len(items) <= 1:', '        return items', '    mid = len(items) // 2', '    left = merge_sort(items[:mid])',
+    '    right = merge_sort(items[mid:])', '    return merge(left, right)', '', 'def merge(left, right):', '    result = []',
+    '    while len(left) > 0 and len(right) > 0:', '        if left[0] <= right[0]:', '            result.append(left.pop(0))', '        else:',
+    '            result.append(right.pop(0))', '    result = result + left + right', '    return result'],
+  linear: ['def linear_search(items, target):', '    for i in range(len(items)):', '        if items[i] == target:', '            return i', '    return -1'],
+  binary: ['def binary_search(items, target):', '    low = 0', '    high = len(items) - 1', '    while low <= high:', '        mid = (low + high) // 2',
+    '        if items[mid] == target:', '            return mid', '        elif items[mid] < target:', '            low = mid + 1', '        else:',
+    '            high = mid - 1', '    return -1']
+};
+function highlightPy(line) {
+  const esc = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return esc.replace(/(#.*)$/, '<span class="cm">$1</span>')
+    .replace(/\b(def|while|for|in|if|elif|else|return|and|True|False)\b/g, '<span class="kw">$1</span>')
+    .replace(/\b(bubble_sort|merge_sort|merge|linear_search|binary_search|len|range|append|pop)\b/g, '<span class="fn">$1</span>')
+    .replace(/(^|[^\w])(\d+)(?![\w])/g, '$1<span class="nu">$2</span>');
+}
+
+/* ==================== traces ==================== */
+// Each algorithm is run once in advance and every step is recorded, so Back is just moving to an earlier step.
+
+function traceBubble(data) {
+  const steps = [], a = clone(data), sorted = [], cnt = { cmp: 0, swp: 0, pass: 0 };
+  const push = s => steps.push(Object.assign({ arr: clone(a), sorted: sorted.slice(), cnt: { ...cnt }, hl: [], swapping: false }, s));
+  push({ label: 'Start', msg: `Bubble sort will put these ${a.length} items into order, smallest first.`, line: [0, 1, 2] });
+  let n = a.length, swapped = true;
+  while (swapped) {
+    swapped = false; cnt.pass++; let passSwaps = 0;
+    push({ label: `Pass ${cnt.pass}`, msg: n > 1 ? `Pass ${cnt.pass}: compare each pair of neighbours, working from the left.` : `Pass ${cnt.pass}: only one item is left unsorted, so there is nothing to compare.`, line: [3, 4] });
+    for (let i = 0; i < n - 1; i++) {
+      const x = a[i].v, y = a[i + 1].v, sw = x > y;
+      cnt.cmp++;
+      push({ label: `Pass ${cnt.pass} · compare`, hl: [i, i + 1], cmp: true, line: [5, 6],
+        msg: `Compare ${x} and ${y}: ${x} ${sw ? '>' : '<'} ${y}, so ${sw ? '<b>swap</b> them' : 'leave them where they are'}.`,
+        predict: { q: `Compare <b>${x}</b> and <b>${y}</b>. Will they swap?`, opts: ['Yes', 'No'], ans: sw ? 'Yes' : 'No', why: sw ? `${x} is bigger than ${y}, so it moves right.` : `${x} is smaller than ${y}, so they are already in order.` } });
+      if (sw) {
+        [a[i], a[i + 1]] = [a[i + 1], a[i]]; cnt.swp++; passSwaps++; swapped = true;
+        push({ label: `Pass ${cnt.pass} · swap`, hl: [i, i + 1], swapping: true, line: [7, 8, 9, 10], msg: `Swapped: ${y} now comes before ${x}. The bigger value keeps “bubbling” to the right.` });
+      }
+    }
+    n--;
+    if (n >= 0) sorted.push(a[n].id);
+    if (!swapped) a.forEach(o => { if (!sorted.includes(o.id)) sorted.push(o.id); });
+    push({ label: `End of pass ${cnt.pass}`, line: swapped ? [11] : [3],
+      msg: swapped ? `End of pass ${cnt.pass}: ${passSwaps} swap${passSwaps === 1 ? '' : 's'}. <b>${a[n].v}</b> has bubbled to its final place, so the next pass can stop one item earlier.`
+                   : `End of pass ${cnt.pass}: <b>no swaps</b>, so the list must be in order. Stop.` });
+  }
+  push({ label: 'Sorted', done: true, line: [], msg: `Sorted! Bubble sort used <b>${cnt.cmp} comparisons</b>, <b>${cnt.swp} swaps</b> and <b>${cnt.pass} pass${cnt.pass === 1 ? '' : 'es'}</b> for ${a.length} items.` });
+  return steps;
+}
+
+function traceMerge(data) {
+  const steps = [], cnt = { cmp: 0, merges: 0 }, n = data.length;
+  const build = (items, depth) => { const node = { items, depth }; if (items.length > 1) { const mid = Math.floor(items.length / 2); node.left = build(items.slice(0, mid), depth + 1); node.right = build(items.slice(mid), depth + 1); } return node; };
+  const root = build(clone(data), 0);
+  let maxD = 0; (function w(nd) { maxD = Math.max(maxD, nd.depth); if (nd.left) { w(nd.left); w(nd.right); } })(root);
+  // the lists at a level: nodes at that depth, plus single items that stopped splitting earlier
+  const rowNodes = d => { const out = []; (function w(nd) { if (nd.depth === d || (!nd.left && nd.depth < d)) out.push(nd); else if (nd.left) { w(nd.left); w(nd.right); } })(root); return out; };
+  const rows = [];
+  let work = null;
+  const push = s => steps.push(Object.assign({ rows: clone(rows), work: clone(work), cnt: { ...cnt }, n }, s));
+  rows.push({ label: 'Start', kind: 'split', groups: [{ items: clone(root.items), state: 'plain' }] });
+  push({ label: 'Start', msg: `Merge sort starts by splitting the list of ${n} items in half, again and again.`, line: [0] });
+  for (let d = 1; d <= maxD; d++) {
+    const nodes = rowNodes(d), before = rowNodes(d - 1).length;
+    rows.push({ label: `Split ${d}`, kind: 'split', groups: nodes.map(nd => ({ items: clone(nd.items), state: 'plain' })) });
+    push({ label: `Split ${d}`, line: [3, 4, 5], msg: `Split every list that has more than one item in half. There are now <b>${nodes.length}</b> lists.`,
+      predict: { q: `There are ${before} list${before > 1 ? 's' : ''}. After splitting each one in half, how many lists will there be?`, opts: opts(nodes.length, [before + 1, before * 2 + 1, nodes.length - 1, before]), ans: String(nodes.length), why: `Each list with more than one item becomes two lists, giving ${nodes.length}.` } });
+  }
+  push({ label: 'Ready to merge', line: [1, 2], msg: `Every list now holds <b>1 item</b> – and a list of 1 item is already sorted. Now merge pairs of lists back together, in order.` });
+  const sortedOf = new Map();
+  (function w(nd) { if (!nd.left) sortedOf.set(nd, nd.items); else { w(nd.left); w(nd.right); } })(root);
+  let mi = 0;
+  for (let d = maxD - 1; d >= 0; d--) {
+    mi++;
+    const nodes = rowNodes(d);
+    const row = { label: `Merge ${mi}`, kind: 'merge', groups: nodes.map(nd => nd.left ? { items: [], slots: nd.items.length, state: 'pending' } : { items: clone(sortedOf.get(nd)), state: 'done' }) };
+    rows.push(row);
+    nodes.forEach((nd, gi) => {
+      if (!nd.left) return;
+      const L = clone(sortedOf.get(nd.left)), R = clone(sortedOf.get(nd.right)), res = [], g = row.groups[gi];
+      g.state = 'active';
+      work = { L: clone(L), R: clone(R), res: [], moved: null };
+      push({ label: `Merge ${mi}`, line: [8, 9], msg: `Merge [${vals(L)}] and [${vals(R)}]. Both lists are already sorted, so only their <b>front</b> items need comparing.` });
+      while (L.length && R.length) {
+        const a = L[0].v, b = R[0].v, takeL = a <= b;
+        cnt.cmp++;
+        const moved = takeL ? L.shift() : R.shift(); res.push(moved);
+        g.items = clone(res); g.slots = nd.items.length - res.length;
+        work = { L: clone(L), R: clone(R), res: clone(res), moved: moved.id };
+        push({ label: `Merge ${mi} · compare`, cmp: true, line: takeL ? [10, 11, 12] : [10, 11, 13, 14], msg: `Compare ${a} and ${b}: <b>${moved.v}</b> is smaller, so it goes into the merged list next.`,
+          predict: { q: `Front items: <b>${a}</b> and <b>${b}</b>. Which goes into the merged list next?`, opts: [String(a), String(b)], ans: String(Math.min(a, b)), why: `${Math.min(a, b)} is the smaller of the two.` } });
+      }
+      const rest = L.concat(R);
+      if (rest.length) {
+        res.push(...rest); g.items = clone(res); g.slots = 0;
+        work = { L: [], R: [], res: clone(res), moved: null, rest: rest.map(o => o.id) };
+        push({ label: `Merge ${mi}`, line: [15], msg: `One list is empty, so the rest (${vals(rest)}) is copied straight across – no more comparisons needed.` });
+      }
+      g.state = 'done'; cnt.merges++; sortedOf.set(nd, res);
+    });
+  }
+  work = null;
+  rows[rows.length - 1].groups.forEach(g => g.state = 'final');
+  push({ label: 'Sorted', done: true, line: [6, 16], msg: `Sorted! Merge sort used <b>${cnt.cmp} comparisons</b> for ${n} items. It needed extra memory to hold the new lists it built.` });
+  return steps;
+}
+
+function traceLinear(data, target) {
+  const steps = [], cnt = { cmp: 0 }, n = data.length;
+  const push = s => steps.push(Object.assign({ arr: data, target, cnt: { ...cnt }, i: null, found: null, seenTo: -1 }, s));
+  push({ label: 'Start', line: [0], msg: `Linear search checks each item in turn, from the start, until it finds <b>${target}</b> or reaches the end. The list does <b>not</b> need to be sorted.` });
+  for (let i = 0; i < n; i++) {
+    cnt.cmp++;
+    const hit = data[i].v === target;
+    push({ label: `Check item ${i}`, cmp: true, i, seenTo: i - 1, found: hit ? i : null, line: hit ? [1, 2, 3] : [1, 2],
+      msg: `Position ${i} holds ${data[i].v}. Is it ${target}? ${hit ? '<b>Yes – found it!</b>' : 'No – move on to the next item.'}` });
+    if (hit) { push({ label: 'Found', done: true, i, found: i, seenTo: i - 1, line: [3], msg: `Found <b>${target}</b> at position ${i} after checking <b>${cnt.cmp}</b> item${cnt.cmp > 1 ? 's' : ''}.` }); return steps; }
+  }
+  push({ label: 'Not found', done: true, seenTo: n - 1, line: [4], msg: `Reached the end of the list: <b>${target} is not in the list</b>. Linear search had to check all ${n} items to be sure.` });
+  return steps;
+}
+
+function traceBinary(data, target) {
+  const steps = [], cnt = { cmp: 0 }, n = data.length;
+  let low = 0, high = n - 1;
+  const push = s => steps.push(Object.assign({ arr: data, target, cnt: { ...cnt }, low, high, mid: null, found: null }, s));
+  push({ label: 'Start', line: [0, 1, 2], msg: `Binary search needs a <b>sorted</b> list. Start with the whole list: low = 0, high = ${n - 1}.`, started: true });
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2), v = data[mid].v;
+    push({ label: 'Find the middle', mid, line: [3, 4], msg: `Middle position = (${low} + ${high}) // 2 = <b>${mid}</b>, which holds ${v}.` });
+    cnt.cmp++;
+    const res = v === target ? 'found' : v < target ? 'right' : 'left';
+    const pred = { q: `The middle item is <b>${v}</b> and we want <b>${target}</b>. What happens next?`, opts: ['Found it!', 'Keep the left half', 'Keep the right half'],
+      ans: res === 'found' ? 'Found it!' : res === 'right' ? 'Keep the right half' : 'Keep the left half',
+      why: res === 'found' ? `${v} is what we are looking for.` : res === 'right' ? `${v} < ${target}, so ${target} can only be to the right.` : `${v} > ${target}, so ${target} can only be to the left.` };
+    if (res === 'found') {
+      push({ label: 'Check the middle', cmp: true, mid, found: mid, line: [5, 6], predict: pred, msg: `${v} = ${target}: <b>found it</b> at position ${mid}!` });
+      push({ label: 'Found', done: true, mid, found: mid, line: [6], msg: `Found <b>${target}</b> at position ${mid} after checking just <b>${cnt.cmp}</b> item${cnt.cmp > 1 ? 's' : ''}. Each check halved the part of the list left to search.` });
+      return steps;
+    }
+    if (res === 'right') {
+      const oldLow = low; low = mid + 1;
+      push({ label: 'Check the middle', cmp: true, mid, line: [5, 7, 8], predict: pred, msg: `${v} is less than ${target}, so ${target} must be to the right. Throw away positions ${oldLow}–${mid}: low = ${mid} + 1 = <b>${low}</b>.` });
+    } else {
+      const oldHigh = high; high = mid - 1;
+      push({ label: 'Check the middle', cmp: true, mid, line: [5, 7, 9, 10], predict: pred, msg: `${v} is greater than ${target}, so ${target} must be to the left. Throw away positions ${mid}–${oldHigh}: high = ${mid} − 1 = <b>${high}</b>.` });
+    }
+  }
+  push({ label: 'Not found', done: true, line: [3, 11], msg: `low (${low}) is now bigger than high (${high}), so there is nothing left to search: <b>${target} is not in the list</b>. Only ${cnt.cmp} items were checked.` });
+  return steps;
+}
+const TRACE = { bubble: traceBubble, merge: traceMerge, linear: traceLinear, binary: traceBinary };
+const NAMES = { bubble: 'Bubble sort', merge: 'Merge sort', linear: 'Linear search', binary: 'Binary search' };
+
+/* ==================== data ==================== */
+const SPEEDS = [0.5, 1, 2, 4, 8];
+const settings = Object.assign({ tool: 'bubble', presenter: false, code: true, predict: false, speed: 2, sortSize: 8, searchSize: 15, kind: 'random', pair: 'search' }, store.get('sortSim.v1', {}));
+if (!['bubble', 'merge', 'linear', 'binary', 'compare'].includes(settings.tool)) settings.tool = 'bubble';
+const save = () => store.set('sortSim.v1', settings);
+let nextId = 1;
+function genValues(n) { const s = new Set(); while (s.size < n) s.add(rnd(2, 99)); return [...s]; }
+function makeSortData() {
+  let v = genValues(settings.sortSize);
+  if (settings.kind === 'sorted') v.sort((a, b) => a - b);
+  else if (settings.kind === 'reversed') v.sort((a, b) => b - a);
+  else if (settings.kind === 'nearly') { v.sort((a, b) => a - b); for (let k = 0; k < 2; k++) { const i = rnd(0, v.length - 2); [v[i], v[i + 1]] = [v[i + 1], v[i]]; } }
+  else shuffle(v);
+  return v.map(x => ({ id: nextId++, v: x }));
+}
+function makeSearchData() { return shuffle(genValues(settings.searchSize)).map(x => ({ id: nextId++, v: x })); }
+const sortedCopy = d => clone(d).sort((a, b) => a.v - b.v);
+
+let sortData = makeSortData(), searchData = makeSearchData();
+let target = searchData[rnd(0, searchData.length - 1)].v;
+let panes = [], pending = null, runTimer = null, history = [], bumped = new Set();
+
+function isSearch(t) { return t === 'linear' || t === 'binary' || (t === 'compare' && settings.pair === 'search'); }
+function build() {
+  stopRun(); pending = null; history = [];
+  const t = settings.tool;
+  if (t === 'compare') {
+    if (settings.pair === 'search') { const s = sortedCopy(searchData); panes = [mkPane('linear', s), mkPane('binary', s)]; }
+    else panes = [mkPane('bubble', sortData), mkPane('merge', sortData)];
+  } else if (t === 'linear') panes = [mkPane('linear', searchData)];
+  else if (t === 'binary') panes = [mkPane('binary', sortedCopy(searchData))];
+  else panes = [mkPane(t, sortData)];
+  renderShell(); update(false);
+}
+function mkPane(algo, data) { return { algo, steps: TRACE[algo](data, target), i: 0 }; }
+const cur = p => p.steps[p.i];
+const finished = p => p.i >= p.steps.length - 1;
+
+/* ==================== stepping ==================== */
+function step() {
+  if (settings.tool === 'compare') { tickCompare(); return; }
+  const p = panes[0];
+  if (pending) {
+    if (!pending.revealed) { pending.revealed = true; renderDock(); return; }
+    pending = null; p.i++; update(true); return;
+  }
+  if (finished(p)) { stopRun(); return; }
+  const nx = p.steps[p.i + 1];
+  if (settings.predict && nx.predict) { pending = { p: nx.predict, chosen: null, revealed: false }; stopRun(); renderDock(); renderButtons(); return; }
+  p.i++; update(true);
+  if (finished(p)) stopRun();
+}
+// In Compare, one tick = one comparison for each algorithm that hasn't finished.
+function tickCompare() {
+  if (panes.every(finished)) { stopRun(); return; }
+  history.push(panes.map(p => p.i));
+  panes.forEach(p => { while (!finished(p)) { p.i++; if (cur(p).cmp || finished(p)) break; } });
+  update(true);
+  if (panes.every(finished)) stopRun();
+}
+function back() {
+  if (pending) { pending = null; renderDock(); renderButtons(); return; }
+  stopRun();
+  if (settings.tool === 'compare') { const h = history.pop(); if (h) { panes.forEach((p, k) => p.i = h[k]); update(false); } return; }
+  const p = panes[0]; if (p.i > 0) { p.i--; update(false); }
+}
+function reset() { stopRun(); pending = null; history = []; panes.forEach(p => p.i = 0); update(false); }
+function newData() {
+  if (isSearch(settings.tool)) { searchData = makeSearchData(); target = searchData[rnd(0, searchData.length - 1)].v; }
+  else sortData = makeSortData();
+  build();
+}
+function startRun() {
+  if (runTimer || panes.every(finished)) return;
+  runTimer = setInterval(() => { if (pending) { stopRun(); return; } step(); }, 1000 / SPEEDS[settings.speed]);
+  renderButtons(); step();
+}
+function stopRun() { if (runTimer) { clearInterval(runTimer); runTimer = null; renderButtons(); } }
+function toggleRun() { runTimer ? stopRun() : startRun(); }
+
+/* ==================== rendering ==================== */
+const stage = $('#stage'), dock = $('#dock');
+function dataControls() {
+  const t = settings.tool, search = isSearch(t);
+  const sizes = search ? [10, 15, 20, 31] : [6, 8, 10, 12];
+  const size = search ? settings.searchSize : settings.sortSize;
+  let h = `<div class="data-ctl"><label class="field">Items <select id="selSize">${sizes.map(s => `<option ${s === size ? 'selected' : ''}>${s}</option>`).join('')}</select></label>`;
+  if (!search) h += `<label class="field">Data <select id="selKind">${[['random', 'Random'], ['nearly', 'Nearly sorted'], ['reversed', 'Reversed'], ['sorted', 'Already sorted']].map(([k, l]) => `<option value="${k}" ${settings.kind === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`;
+  else h += `<label class="field">Find <input class="inp" id="inTarget" inputmode="numeric" value="${target}" aria-label="Value to search for"></label><button class="btn" data-act="missing" title="Search for a value that isn't in the list">Not in list</button>`;
+  h += `<button class="btn" data-act="new" title="New data (D)">New data</button></div>`;
+  return h;
+}
+const SUBS = {
+  bubble: 'Compare neighbours and swap them if they are in the wrong order. Repeat passes until a pass has no swaps.',
+  merge: 'Split the list in half until every list has 1 item, then merge the lists back together in order.',
+  linear: 'Check every item in turn, from the start, until the target is found.',
+  binary: 'Check the middle of a sorted list and throw away the half that can’t contain the target.'
+};
+function renderShell() {
+  const t = settings.tool;
+  document.querySelectorAll('.seg.tools button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === t));
+  if (t === 'compare') {
+    const pair = settings.pair;
+    stage.innerHTML = `<div class="tool-head"><div><h2>Compare</h2><div class="sub">Both algorithms work on the same data. Each tick is one comparison for each of them.</div></div>
+      <div class="data-ctl"><div class="seg" role="group" aria-label="What to compare"><button data-pair="search" aria-pressed="${pair === 'search'}">Linear vs binary search</button><button data-pair="sort" aria-pressed="${pair === 'sort'}">Bubble vs merge sort</button></div></div></div>
+      <div style="display:flex;justify-content:center;margin-bottom:.7rem">${dataControls()}</div>
+      <div class="panes">${panes.map((p, k) => `<div class="pane" id="pane${k}"><h3><span>${NAMES[p.algo]}</span><span class="status"></span></h3><div class="viz"></div><div class="counters" style="margin-top:.6rem"></div></div>`).join('')}</div>
+      <div class="verdict" id="verdict"></div>`;
+  } else {
+    stage.innerHTML = `<div class="tool-head"><div><h2>${NAMES[t]}</h2><div class="sub">${SUBS[t]}</div></div>${dataControls()}</div>
+      <div class="pane-single" id="pane0"><div class="viz"></div>
+      <div class="lower${settings.code ? '' : ' nocode'}"><div><div class="counters"></div>${legendFor(t)}</div>
+      ${settings.code ? `<div class="codebox"><div class="ch"><span>Python</span><span>${NAMES[t].toLowerCase()}</span></div><pre>${CODE[t].map((l, i) => `<span class="ln" data-l="${i}"><span class="no">${i + 1}</span>${highlightPy(l) || ' '}</span>`).join('')}</pre></div>` : ''}</div></div>`;
+  }
+}
+function legendFor(t) {
+  const L = {
+    bubble: [['var(--cmp)', 'being compared'], ['var(--swap)', 'swapped'], ['var(--accent)', 'in its final place']],
+    merge: [['var(--cmp)', 'being compared / just moved'], ['#fff6cc', 'list being merged'], ['var(--accent)', 'fully sorted']],
+    linear: [['var(--cmp)', 'being checked'], ['var(--disc)', 'already checked'], ['var(--accent)', 'found']],
+    binary: [['var(--cmp)', 'being checked'], ['var(--disc)', 'thrown away'], ['var(--accent)', 'found']]
+  }[t];
+  return `<div class="legend rev-only">${L.map(([c, l]) => `<span><span class="sw" style="background:${c};border:1px solid #9aa3b5"></span>${l}</span>`).join('')}</div>`;
+}
+
+function bubbleViz(el, s, compact) {
+  let box = el.querySelector('.bars');
+  if (!box) { el.innerHTML = `<div class="bars${compact ? ' compact' : ''}"></div>`; box = el.querySelector('.bars'); }
+  const n = s.arr.length, max = Math.max(...s.arr.map(o => o.v)), seen = new Set();
+  s.arr.forEach((o, i) => {
+    let b = box.querySelector(`[data-id="${o.id}"]`);
+    if (!b) { b = document.createElement('div'); b.dataset.id = o.id; b.textContent = o.v; box.appendChild(b); }
+    b.style.left = `calc(${(i * 100) / n}% + 0.18rem)`;
+    b.style.width = `calc(${100 / n}% - 0.36rem)`;
+    b.style.height = `calc(1.8rem + (100% - 2.4rem) * ${(o.v / max).toFixed(3)})`;
+    const hl = s.hl.includes(i);
+    b.className = 'bar' + (s.sorted.includes(o.id) ? ' done' : '') + (hl ? (s.swapping ? ' swap' : ' cmp') : '');
+    b.setAttribute('aria-label', `${o.v}`);
+    seen.add(String(o.id));
+  });
+  box.querySelectorAll('.bar').forEach(b => { if (!seen.has(b.dataset.id)) b.remove(); });
+}
+function mcell(o, cls = '') { return `<div class="mc ${cls}">${o.v}</div>`; }
+function mergeViz(el, s, compact) {
+  const rows = compact ? s.rows.slice(-1) : s.rows;
+  let h = '<div class="mrows">';
+  rows.forEach(r => {
+    h += `<div class="mrow"><div class="mlab ${r.kind}">${r.label}</div><div class="mgroups">`;
+    r.groups.forEach(g => {
+      const movedId = s.work && s.work.moved;
+      h += `<div class="mg ${g.state}">` + g.items.map(o => mcell(o, g.state === 'final' ? 'fin' : o.id === movedId && g.state === 'active' ? 'moved' : '')).join('') +
+        Array(g.slots || 0).fill('<div class="mc slot"></div>').join('') + `</div>`;
+    });
+    h += '</div></div>';
+  });
+  h += '</div>';
+  if (s.work && !compact) {
+    const W = s.work;
+    h += `<div class="work"><div><div class="wl">Left list</div><div class="wg">${W.L.map((o, k) => mcell(o, k === 0 && W.R.length ? 'front' : '')).join('') || '<small>empty</small>'}</div></div>
+      <div><div class="wl">Right list</div><div class="wg">${W.R.map((o, k) => mcell(o, k === 0 && W.L.length ? 'front' : '')).join('') || '<small>empty</small>'}</div></div>
+      <div class="arrow">→</div><div><div class="wl">Merged</div><div class="wg">${W.res.map(o => mcell(o, o.id === W.moved || (W.rest && W.rest.includes(o.id)) ? 'moved' : '')).join('') || '<small>empty</small>'}</div></div></div>`;
+  }
+  el.innerHTML = h;
+}
+function searchViz(el, s, algo) {
+  const n = s.arr.length;
+  let h = `<div class="target">Looking for <b>${s.target}</b></div><div class="cards" style="--n:${n}">`;
+  s.arr.forEach((o, i) => {
+    const ptrs = []; let cls = '';
+    if (algo === 'binary') {
+      if (!s.done || s.found == null) { if (i === s.low && s.low <= s.high) ptrs.push('low'); if (i === s.high && s.low <= s.high) ptrs.push('high'); }
+      if (i === s.mid) ptrs.push('mid');
+      if (s.found === i) cls = 'found';
+      else if (i === s.mid && s.cmp) cls = 'chk';
+      else if (i < s.low || i > s.high) cls = 'disc';
+      else if (i === s.mid) cls = 'chk';
+    } else {
+      if (i === s.i && !s.done) ptrs.push('i');
+      if (s.found === i) cls = 'found'; else if (i === s.i && !s.done) cls = 'chk'; else if (i <= s.seenTo) cls = 'seen';
+    }
+    h += `<div class="card ${cls}" data-v="${o.v}" title="Search for ${o.v}"><div class="ptrs">${ptrs.map(p => `<span class="ptr p-${p}">${p}</span>`).join('')}</div><div class="cv">${o.v}</div><div class="idx">${i}</div></div>`;
+  });
+  el.innerHTML = h + '</div>';
+}
+function countersFor(p) {
+  const s = cur(p), n = (s.arr || []).length || s.n;
+  switch (p.algo) {
+    case 'bubble': return [['Comparisons', s.cnt.cmp, 'cmp'], ['Swaps', s.cnt.swp, 'swp'], ['Passes', s.cnt.pass, 'pass']];
+    case 'merge': return [['Comparisons', s.cnt.cmp, 'cmp'], ['Merges done', s.cnt.merges, 'merges'], ['Extra memory', `${s.n}<small> items</small>`, 'mem']];
+    case 'linear': return [['Items checked', s.cnt.cmp, 'cmp'], ['Worst case', `${n}<small> checks</small>`, 'w']];
+    case 'binary': return [['Items checked', s.cnt.cmp, 'cmp'], ['Still to search', (k => `${k}<small> item${k === 1 ? '' : 's'}</small>`)(Math.max(0, s.found != null ? 1 : s.high - s.low + 1)), 'left'], ['Worst case', `${log2c(n)}<small> checks</small>`, 'w']];
+  }
+}
+function update(fresh) {
+  panes.forEach((p, k) => {
+    const root = $('#pane' + k), s = cur(p), compact = settings.tool === 'compare';
+    const viz = root.querySelector('.viz');
+    if (p.algo === 'bubble') bubbleViz(viz, s, compact);
+    else if (p.algo === 'merge') mergeViz(viz, s, compact);
+    else searchViz(viz, s, p.algo);
+    const prev = root._prev || {};
+    const cs = countersFor(p);
+    root.querySelector('.counters').innerHTML = cs.map(([l, v, key]) => `<div class="counter${fresh && prev[key] !== undefined && prev[key] !== String(v) ? ' bump' : ''}"><div class="cl">${l}</div><div class="cn">${v}</div></div>`).join('');
+    root._prev = Object.fromEntries(cs.map(([, v, key]) => [key, String(v)]));
+    root.querySelectorAll('.ln').forEach(ln => ln.classList.toggle('on', (s.line || []).includes(+ln.dataset.l)));
+    scrollCode(root);
+    if (compact) {
+      const st = root.querySelector('.status'); st.textContent = finished(p) ? 'Finished' : p.i === 0 ? 'Ready' : 'Working…'; st.classList.toggle('fin', finished(p));
+    }
+  });
+  if (settings.tool === 'compare') {
+    const all = panes.every(finished);
+    panes.forEach((p, k) => $('#pane' + k).classList.toggle('winner', all && cur(p).cnt.cmp < cur(panes[1 - k]).cnt.cmp));
+    $('#verdict').innerHTML = all ? `<span class="okbox">${compareSummary()}</span>` : '';
+  }
+  renderDock(); renderPanel(); renderButtons();
+}
+// keep the highlighted lines visible when the code box is shorter than the code
+function scrollCode(root) {
+  const box = root.querySelector('.codebox'), on = root.querySelectorAll('.ln.on'); if (!box || !on.length) return;
+  const head = box.querySelector('.ch').offsetHeight, top = on[0].offsetTop - head, bottom = on[on.length - 1].offsetTop + on[on.length - 1].offsetHeight;
+  if (top < box.scrollTop || bottom > box.scrollTop + box.clientHeight) box.scrollTop = Math.max(0, top - head - 8);
+}
+function compareSummary() {
+  const [a, b] = panes.map(p => ({ name: NAMES[p.algo], c: cur(p).cnt.cmp }));
+  if (a.c === b.c) return `Both used ${a.c} comparisons on this data.`;
+  const [w, l] = a.c < b.c ? [a, b] : [b, a];
+  return `${w.name} used ${w.c} comparisons; ${l.name.toLowerCase()} used ${l.c}.`;
+}
+function renderButtons() {
+  const done = panes.every(finished);
+  const atStart = settings.tool === 'compare' ? !history.length : panes[0].i === 0;
+  $('#btnBack').disabled = atStart && !pending;
+  $('#btnStep').disabled = done && !pending;
+  const run = $('#btnRun'); run.disabled = done && !runTimer;
+  run.innerHTML = runTimer ? '⏸ <span class="lbl">Pause</span>' : '▶ <span class="lbl">Run</span>';
+  $('#tgPredict').setAttribute('aria-pressed', settings.predict);
+  $('#tgPredict').disabled = settings.tool === 'compare';
+  $('#tgCode').setAttribute('aria-pressed', settings.code);
+  $('#tgCode').disabled = settings.tool === 'compare';
+  $('#tgMode').setAttribute('aria-pressed', settings.presenter);
+  $('#tgMode').textContent = settings.presenter ? 'Revision mode' : 'Presenter mode';
+  $('#speedLabel').textContent = `${SPEEDS[settings.speed]} step${SPEEDS[settings.speed] === 1 ? '' : 's'}/sec`;
+  document.documentElement.classList.toggle('presenter', settings.presenter);
+}
+function renderDock() {
+  if (pending) {
+    const p = pending.p, rev = pending.revealed;
+    let h = `<div><span class="badge predict">Predict</span>${p.q}</div><div class="opts">`;
+    p.opts.forEach((o, i) => { let c = ''; if (rev) c = o === p.ans ? 'right' : o === pending.chosen ? 'wrong' : 'dim'; h += `<button class="opt ${c}" data-i="${i}" ${rev ? 'disabled' : ''}>${o}</button>`; });
+    h += '</div>';
+    if (rev) {
+      const ok = pending.chosen === p.ans, none = pending.chosen == null;
+      h += `<div class="fb ${ok ? 'ok' : 'bad'}"><span class="mark">${none ? 'Answer:' : ok ? '✓ Correct!' : '✗ Not quite.'}</span>${none || !ok ? `It’s <b>${p.ans}</b>. ` : ''}${p.why}</div><div class="dock-hint">Press <kbd>Space</kbd> or <button class="btn" id="dockGo">Show the step ▶</button></div>`;
+    } else h += `<div class="dock-hint">Choose an answer, or press <kbd>Space</kbd> to reveal it.</div>`;
+    dock.innerHTML = h;
+    dock.querySelectorAll('.opt').forEach(b => b.addEventListener('click', () => { pending.chosen = p.opts[+b.dataset.i]; pending.revealed = true; renderDock(); }));
+    const go = $('#dockGo'); if (go) go.addEventListener('click', step);
+    return;
+  }
+  if (settings.tool === 'compare') {
+    const all = panes.every(finished);
+    dock.innerHTML = `<div><span class="badge${all ? ' done' : ''}">${all ? 'Finished' : 'Compare'}</span>${all ? compareSummary() : panes.map(p => `<b>${NAMES[p.algo]}:</b> ${cur(p).cnt.cmp} comparisons`).join(' · ') + (history.length ? '' : ' – press <kbd>Space</kbd> to start the race.')}</div>`;
+    return;
+  }
+  const s = cur(panes[0]);
+  dock.innerHTML = `<div><span class="badge${s.done ? ' done' : ''}">${s.label}</span>${s.msg}${panes[0].i === 0 ? ' Press <kbd>Space</kbd> to step through.' : ''}</div>`;
+}
+
+/* ---------- side panel ---------- */
+const HOW = {
+  bubble: `<h2>Bubble sort</h2><ol><li>Compare the first two items. If they are in the wrong order, <b>swap</b> them.</li><li>Move along one place and compare the next pair. Repeat to the end of the list – that is one <b>pass</b>.</li><li>After each pass, the biggest unsorted item has “bubbled” to the end.</li><li>Keep doing passes until a pass makes <b>no swaps</b>.</li></ol>
+    <h3>Efficiency</h3><p>Simple to write, but slow on big lists: for <i>n</i> items it can need up to <i>n</i>(<i>n</i> − 1) ÷ 2 comparisons. It sorts <b>in place</b>, so it needs almost no extra memory.</p>
+    <div class="tip"><span class="tip-title">Try this</span>Set the data to <b>Already sorted</b>: bubble sort stops after one pass. Then try <b>Reversed</b> – the worst case.</div>`,
+  merge: `<h2>Merge sort</h2><ol><li><b>Split</b> the list in half, then split each half again, until every list holds just 1 item.</li><li><b>Merge</b> pairs of lists: compare the front items and take the smaller one each time, so the merged list is in order.</li><li>Keep merging until there is one sorted list.</li></ol>
+    <h3>Efficiency</h3><p>Much faster than bubble sort on big lists – about <i>n</i> × log<sub>2</sub> <i>n</i> comparisons. But it needs <b>extra memory</b> for the new lists it builds, and it is harder to code.</p>
+    <div class="tip"><span class="tip-title">Exam tip</span>Draw the splits and merges as rows, exactly like the diagram here. Show every level.</div>`,
+  linear: `<h2>Linear search</h2><ol><li>Start at the first item.</li><li>If it is the target, stop – found it.</li><li>If not, move to the next item and repeat.</li><li>If you reach the end, the target is not in the list.</li></ol>
+    <h3>Efficiency</h3><p>Works on <b>any</b> list, sorted or not. But on a list of <i>n</i> items it may need to check all <i>n</i> (the worst case: the target is last or missing).</p>
+    <div class="tip"><span class="tip-title">Try this</span>Click a card near the end, then one near the start, and compare the number of checks. Then try <b>Not in list</b>.</div>`,
+  binary: `<h2>Binary search</h2><ol><li>The list <b>must be sorted</b>.</li><li>Look at the <b>middle</b> item. If it is the target, stop.</li><li>If the target is bigger, throw away the left half (and the middle). If smaller, throw away the right half.</li><li>Repeat on what is left until found – or nothing is left.</li></ol>
+    <h3>Efficiency</h3><p>Each check halves the list, so even 1,000,000 items need at most 20 checks. The catch: the data has to be sorted first.</p>
+    <div class="tip"><span class="tip-title">Exam tip</span>When the middle falls between two items, this code rounds <b>down</b> using integer division: (low + high) // 2. Always show low, high and mid at each step.</div>`,
+  compare: `<h2>Comparing algorithms</h2><p>“Efficiency” at GCSE means counting the work an algorithm does – the number of <b>comparisons</b>, the number of <b>passes</b> through a loop, and how much <b>memory</b> it uses.</p>
+    <p>Here both algorithms get exactly the same data, and each tick is one comparison for each of them. Notice how the gap grows as the list gets longer.</p>
+    <div class="tip"><span class="tip-title">Try this</span>Change the number of items and race them again. Which algorithm’s count grows faster?</div>`
+};
+function effTable() {
+  const rows = [10, 100, 1000, 1000000].map(n => {
+    const lg = Math.ceil(Math.log2(n)), merge = n * lg - Math.pow(2, lg) + 1;
+    return `<tr><td class="m">${n.toLocaleString('en-GB')}</td><td class="m">${n.toLocaleString('en-GB')}</td><td class="m">${log2c(n)}</td><td class="m">${(n * (n - 1) / 2).toLocaleString('en-GB')}</td><td class="m">${merge.toLocaleString('en-GB')}</td></tr>`;
+  }).join('');
+  return `<table class="tbl"><tr><th>Items</th><th>Linear</th><th>Binary</th><th>Bubble</th><th>Merge</th></tr>${rows}</table><p style="font-size:.8rem;color:var(--muted)">Worst-case number of comparisons.</p>`;
+}
+function renderPanel() {
+  const t = settings.tool;
+  let h = HOW[t];
+  if (t !== 'compare') { const s = cur(panes[0]); h += `<div class="tip now"><span class="tip-title">This step · ${s.label}</span>${s.msg}</div>`; }
+  else h += effTable();
+  $('#p-how').innerHTML = h;
+}
+$('#p-ideas').innerHTML = `
+  <h3 style="margin-top:0">What is an algorithm?</h3><p>A precise sequence of steps for solving a problem. Searching and sorting are so common that there are <b>standard algorithms</b> for them.</p>
+  <h3>Searching</h3>
+  <table class="tbl"><tr><th></th><th>Linear search</th><th>Binary search</th></tr>
+  <tr><td>Data must be sorted?</td><td>No</td><td><b>Yes</b></td></tr>
+  <tr><td>How it works</td><td>Checks each item in turn</td><td>Checks the middle, throws away half</td></tr>
+  <tr><td>Speed on big lists</td><td>Slow</td><td>Very fast</td></tr>
+  <tr><td>Best for</td><td>Small or unsorted lists</td><td>Large sorted lists</td></tr></table>
+  <h3>Sorting</h3>
+  <table class="tbl"><tr><th></th><th>Bubble sort</th><th>Merge sort</th></tr>
+  <tr><td>How it works</td><td>Swaps neighbours, pass after pass</td><td>Splits, then merges in order</td></tr>
+  <tr><td>Speed on big lists</td><td>Slow</td><td>Fast</td></tr>
+  <tr><td>Extra memory</td><td>Almost none (sorts in place)</td><td>Needs extra space for the new lists</td></tr>
+  <tr><td>Ease of coding</td><td>Easy</td><td>Harder (uses recursion)</td></tr></table>
+  <h3>Measuring efficiency</h3><p>At GCSE you compare algorithms by counting <b>comparisons</b>, <b>passes through a loop</b> and <b>use of memory</b> – for the same set of test data.</p>
+  ${effTable()}
+  <div class="tip exam"><span class="tip-title">Exam tips</span><ul>
+    <li>You may be asked to show each <b>pass</b> of a bubble sort, or each <b>level</b> of a merge sort.</li>
+    <li>For a binary search, write down low, high and mid at every step.</li>
+    <li>Binary search only works on a <b>sorted</b> list – say so if a question asks why it can’t be used.</li>
+    <li>When asked which algorithm is “better”, say what it depends on: the size of the data, whether it is sorted, and memory available.</li></ul></div>`;
+
+const QUIZ = [
+  { q: 'What must be true of a list before a binary search can be used?', o: ['It must be sorted', 'It must contain numbers only', 'It must have an even number of items', 'It must be short'], why: 'Binary search relies on order to know which half to throw away.' },
+  { q: 'A linear search is used on a list of 50 items. What is the most items it may need to check?', o: ['50', '25', '6', '49'], why: 'In the worst case (the item is last or missing), every item is checked.' },
+  { q: 'A binary search is used on a sorted list of 1,000 items. Roughly how many items will it check at most?', o: ['10', '500', '1,000', '100'], why: 'Each check halves the list: 1000 → 500 → 250 → … → 1 takes about 10 halvings.' },
+  { q: 'In bubble sort, what is one “pass”?', o: ['Going through the list once, comparing each pair of neighbours', 'Swapping two items', 'Splitting the list in half', 'Checking the middle item'], why: 'Each pass compares neighbours from the start to the end of the unsorted part.' },
+  { q: 'When does the bubble sort in this simulation stop?', o: ['When a pass makes no swaps', 'After exactly one pass', 'When the first item is the smallest', 'After n swaps'], why: 'No swaps means every pair is already in order.' },
+  { q: 'What is the first stage of a merge sort?', o: ['Repeatedly split the list in half until each list has 1 item', 'Compare neighbouring items and swap them', 'Find the middle item', 'Merge the first two items'], why: 'Merge sort splits first, then merges.' },
+  { q: 'Why is merging two sorted lists quick?', o: ['Only the front items of each list need to be compared', 'The lists are always short', 'No comparisons are needed', 'Each item is compared with every other item'], why: 'The smallest remaining item must be at the front of one of the two lists.' },
+  { q: 'Which is a disadvantage of merge sort compared with bubble sort?', o: ['It uses more memory', 'It is slower on large lists', 'It only works on sorted data', 'It needs more passes'], why: 'It builds new lists as it merges, so it needs extra memory.' },
+  { q: 'Which algorithm would be best for searching a large, unsorted list once?', o: ['Linear search', 'Binary search', 'Bubble sort', 'Merge sort'], why: 'Binary search would need the list sorting first, which takes much longer than one linear search.' },
+  { q: 'Binary search on [3, 8, 12, 19, 25, 31, 40] for 31. Which item is checked first?', o: ['19', '3', '25', '31'], why: 'low = 0, high = 6, mid = (0 + 6) // 2 = 3, which holds 19.' }
+];
+const quizState = QUIZ.map(q => ({ order: shuffle(q.o.map((_, i) => i)), chosen: null }));
+function renderQuiz() {
+  const right = quizState.filter(x => x.chosen === 0).length;
+  let h = `<p>Answer each question – you’ll see straight away if you’re right. Score: <b>${right} / ${QUIZ.length}</b></p>`;
+  QUIZ.forEach((q, qi) => {
+    const st = quizState[qi];
+    h += `<div class="q"><p>${qi + 1}. ${q.q}</p><div class="qopts">`;
+    st.order.forEach(oi => { let c = ''; if (st.chosen != null) c = oi === 0 ? 'right' : oi === st.chosen ? 'wrong' : ''; h += `<button class="qopt ${c}" data-q="${qi}" data-o="${oi}" ${st.chosen != null ? 'disabled' : ''}>${q.o[oi]}</button>`; });
+    h += '</div>' + (st.chosen != null ? `<div class="qwhy">${st.chosen === 0 ? '✓ Correct. ' : '✗ Not quite. '}${q.why}</div>` : '') + '</div>';
+  });
+  h += `<button class="btn" id="quizReset">Try again</button>`;
+  const el = $('#p-quiz'); el.innerHTML = h;
+  el.querySelectorAll('.qopt').forEach(b => b.addEventListener('click', () => { quizState[+b.dataset.q].chosen = +b.dataset.o; renderQuiz(); }));
+  $('#quizReset').addEventListener('click', () => { quizState.forEach(x => { x.chosen = null; shuffle(x.order); }); renderQuiz(); });
+}
+const TABS = ['how', 'ideas', 'quiz'];
+function showTab(t) { TABS.forEach(x => { $('#t-' + x).setAttribute('aria-selected', x === t); $('#p-' + x).hidden = x !== t; }); }
+TABS.forEach((t, i) => {
+  const b = $('#t-' + t);
+  b.addEventListener('click', () => showTab(t));
+  b.addEventListener('keydown', e => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); const n = TABS[(i + (e.key === 'ArrowRight' ? 1 : 2)) % 3]; showTab(n); $('#t-' + n).focus(); } });
+});
+
+/* ---------- events ---------- */
+function setTarget(v) {
+  if (!Number.isFinite(v)) return;
+  target = v; build();
+}
+stage.addEventListener('click', e => {
+  const card = e.target.closest('.card[data-v]');
+  if (card && !runTimer) { setTarget(+card.dataset.v); return; }
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  if (b.dataset.pair) { settings.pair = b.dataset.pair; save(); build(); return; }
+  if (b.dataset.act === 'new') newData();
+  if (b.dataset.act === 'missing') { const have = new Set(searchData.map(o => o.v)); let v; do { v = rnd(2, 99); } while (have.has(v)); setTarget(v); }
+});
+stage.addEventListener('change', e => {
+  if (e.target.id === 'selSize') { const n = +e.target.value; if (isSearch(settings.tool)) settings.searchSize = n; else settings.sortSize = n; save(); newData(); }
+  if (e.target.id === 'selKind') { settings.kind = e.target.value; save(); sortData = makeSortData(); build(); }
+  if (e.target.id === 'inTarget') { const v = parseInt(e.target.value, 10); if (Number.isFinite(v)) setTarget(v); }
+});
+stage.addEventListener('keydown', e => { if (e.target.id === 'inTarget' && e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
+
+function setTool(t) { settings.tool = t; save(); build(); }
+document.querySelectorAll('.seg.tools button').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
+function toggle(k) {
+  settings[k] = !settings[k]; save();
+  if (k === 'predict' && !settings.predict) pending = null;
+  if (k === 'code') { renderShell(); update(false); } else if (k === 'presenter') { renderButtons(); update(false); } else { renderDock(); renderButtons(); }
+}
+function fullscreen() { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) {} }
+if (!document.fullscreenEnabled) $('#btnFull').hidden = true;
+$('#btnStep').addEventListener('click', step);
+$('#btnBack').addEventListener('click', back);
+$('#btnRun').addEventListener('click', toggleRun);
+$('#btnReset').addEventListener('click', reset);
+$('#tgPredict').addEventListener('click', () => toggle('predict'));
+$('#tgCode').addEventListener('click', () => toggle('code'));
+$('#tgMode').addEventListener('click', () => toggle('presenter'));
+$('#btnFull').addEventListener('click', fullscreen);
+$('#btnHelp').addEventListener('click', () => $('#helpDlg').showModal());
+$('#speed').value = settings.speed;
+$('#speed').addEventListener('input', e => { settings.speed = +e.target.value; save(); renderButtons(); if (runTimer) { stopRun(); startRun(); } });
+
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (document.querySelector('dialog[open]')) return;
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
+  if (e.target.getAttribute && e.target.getAttribute('role') === 'tab' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return;
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  const tools = ['bubble', 'merge', 'linear', 'binary', 'compare'];
+  const map = {
+    ' ': step, ArrowRight: step, PageDown: step, ArrowLeft: back, PageUp: back, g: toggleRun, r: reset, d: newData,
+    q: () => { if (settings.tool !== 'compare') toggle('predict'); }, c: () => { if (settings.tool !== 'compare') toggle('code'); },
+    p: () => toggle('presenter'), f: fullscreen, '?': () => $('#helpDlg').showModal()
+  };
+  tools.forEach((t, i) => map[String(i + 1)] = () => setTool(t));
+  const fn = map[k]; if (fn) { e.preventDefault(); fn(); }
+});
+
+renderQuiz(); build();
+})();
+</script>
+</body>
+</html>

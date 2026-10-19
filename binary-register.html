@@ -1,0 +1,946 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Binary Register Playground</title>
+<style>
+:root{
+  --bg:#eef1f6; --surface:#ffffff; --surface2:#f6f7fa; --ink:#151a26; --muted:#56607a; --line:#d3d8e3;
+  --accent:#0d6b67; --accent-soft:#e2f2f0;
+  --sign:#b42318; --sign-soft:#fde4e1;
+  --hexc:#c25a00; --data-soft:#fdeedc;
+  --hi:#ffd84d; --ok:#14713f; --ok-soft:#dff3e6; --bad:#b42318; --bad-soft:#fde4e1;
+  --mono:ui-monospace,"Cascadia Mono","Consolas","Menlo","DejaVu Sans Mono",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --cell:3.6rem; --acell:3rem; --cg:.35rem; --ng:1.1rem;
+}
+html{font-size:15px}
+html.presenter{font-size:clamp(14px,min(2.05vh,1.12vw),34px)}
+html.presenter{--cell:5rem;--acell:3.9rem}
+html.presenter .big{font-size:3.6rem}
+html.presenter .shift-vals .v{font-size:2.6rem}
+html.presenter body{height:100vh;display:flex;flex-direction:column;overflow:hidden}
+html.presenter .layout{flex:1;min-height:0;overflow:auto;width:100%;align-content:center}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.45}
+button,select,input{font:inherit;color:inherit}
+kbd{font-family:var(--mono);font-size:.85em;border:1px solid var(--line);border-bottom-width:2px;border-radius:.3rem;padding:0 .3rem;background:var(--surface);color:var(--ink)}
+code{font-family:var(--mono)}
+h2{font-size:1.15rem;margin:.2rem 0 .6rem}
+h3{font-size:1rem;margin:1.2rem 0 .4rem}
+small{font-weight:400;color:var(--muted)}
+
+/* ---------- top bar ---------- */
+.topbar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1rem;padding:.55rem 1rem;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:30}
+.brand{display:flex;flex-direction:column;line-height:1.15;margin-right:.5rem}
+.brand h1{font-size:1.15rem;margin:0}
+.brand span{font-size:.75rem;color:var(--muted)}
+.group{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:.5rem;padding:.35rem .75rem;min-height:2.3rem;cursor:pointer;font-size:.9rem;white-space:nowrap}
+.btn:hover{background:var(--surface2)}
+.btn:focus-visible,.bit:focus-visible,.tab:focus-visible,.seg button:focus-visible{outline:3px solid #1f5fd6;outline-offset:2px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.btn.primary:hover{background:#0a5753}
+.btn[disabled]{opacity:.4;cursor:default}
+.btn[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.btn.icon{min-width:2.3rem;padding:.35rem .5rem}
+.spacer{flex:1}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:.55rem;overflow:hidden;background:var(--surface)}
+.seg button{border:0;border-right:1px solid var(--line);background:transparent;padding:.4rem .85rem;cursor:pointer;font-weight:700;color:var(--muted);min-height:2.3rem;white-space:nowrap}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.seg.tools button{font-size:.95rem}
+
+/* ---------- layout ---------- */
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 27rem;gap:1rem;padding:1rem;max-width:112rem;margin:0 auto;align-items:start}
+@media (max-width:1180px){.layout{grid-template-columns:minmax(0,1fr)}}
+html.presenter .layout{grid-template-columns:minmax(0,1fr);max-width:none;padding:.8rem 1.2rem}
+html.presenter #panel,html.presenter .rev-only{display:none!important}
+.stage{background:var(--surface);border:2px solid var(--ink);border-radius:.9rem;padding:1.2rem 1.4rem 1.6rem;min-width:0}
+html.presenter .stage{border-width:3px;max-width:90rem;margin:0 auto;width:100%}
+.tool-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.6rem;margin-bottom:1.1rem}
+.tool-head h2{margin:0;font-size:1.3rem}
+.tool-head .sub{color:var(--muted);font-size:.85rem}
+.ctl{display:flex;flex-wrap:wrap;gap:.45rem;justify-content:center;align-items:center;margin-top:1.3rem}
+.ctl input{border:1px solid var(--line);border-radius:.5rem;padding:.35rem .55rem;width:7rem;min-height:2.3rem;font-family:var(--mono)}
+.ctl .sep{width:1px;height:1.8rem;background:var(--line);margin:0 .3rem}
+.note{font-size:.85rem;color:var(--muted);text-align:center;margin:.7rem 0 0}
+.states{text-align:center;font-size:1rem;margin:0 0 1rem;display:flex;gap:.4rem 1.2rem;justify-content:center;flex-wrap:wrap;align-items:center}
+.stepper{display:inline-flex;align-items:center;gap:.35rem;font-weight:700}
+.stepper .btn{min-width:2.3rem;padding:.2rem .5rem}
+.pill{display:inline-block;background:var(--surface2);border:1px solid var(--line);border-radius:99px;padding:.15rem .7rem}
+
+/* ---------- register ---------- */
+.regwrap{overflow-x:auto;padding:.3rem 0}
+.reg{display:flex;justify-content:center;gap:var(--ng);width:max-content;margin:0 auto}
+.nib{display:flex;flex-direction:column;align-items:stretch}
+.nib-bits{display:flex;gap:var(--cg)}
+.colb{display:flex;flex-direction:column;align-items:center;gap:.25rem}
+.pv{font-family:var(--mono);font-size:.9rem;color:var(--muted);font-weight:700;height:1.35rem;white-space:nowrap}
+.pv.neg{color:var(--sign)}
+.under{font-size:.7rem;font-weight:800;color:var(--sign);height:1rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+.bit{width:var(--cell);height:calc(var(--cell)*1.18);border:2px solid var(--ink);border-radius:.55rem;background:var(--surface);font-family:var(--mono);font-size:calc(var(--cell)*.6);font-weight:800;cursor:pointer;color:var(--ink);padding:0;transition:background .15s,color .15s;position:relative;display:flex;align-items:center;justify-content:center}
+.bit:hover:not(:disabled){background:var(--surface2)}
+.bit.b1{background:var(--accent);border-color:var(--accent);color:#fff}
+.bit.b1:hover:not(:disabled){background:#0a5753}
+.bit.sign{border-color:var(--sign)}
+.bit.sign.b1{background:var(--sign);border-color:var(--sign)}
+.bit:disabled{cursor:default}
+.bit.hidebit{color:transparent;background:var(--surface2);border-style:dashed;border-color:var(--muted)}
+.bit.flash{animation:ring .9s ease-out}
+@keyframes ring{0%{box-shadow:0 0 0 .5rem var(--hi)}100%{box-shadow:0 0 0 0 rgba(255,216,77,0)}}
+.bit.incoming{box-shadow:0 0 0 .35rem var(--hi)}
+.hexlab{font-family:var(--mono);font-weight:800;font-size:1.25rem;margin-top:.35rem;border-top:3px solid var(--hexc);text-align:center;padding-top:.15rem;color:var(--hexc)}
+.readout{text-align:center;margin-top:1.1rem}
+.big{font-size:2.7rem;font-weight:800;font-family:var(--mono);line-height:1.15}
+.work{font-family:var(--mono);color:var(--muted);font-size:1.1rem;min-height:1.5em}
+.alt{font-size:.95rem;margin-top:.3rem}
+.hexline{font-family:var(--mono);color:var(--hexc);font-weight:800;margin-top:.3rem}
+.masked{color:var(--muted)}
+
+/* ---------- addition ---------- */
+.addwrap{overflow-x:auto;padding:.3rem 0}
+.addgrid{display:grid;grid-template-columns:3.4rem repeat(9,var(--acell)) 1rem minmax(8.5rem,auto);column-gap:.3rem;row-gap:.35rem;align-items:center;width:max-content;margin:0 auto}
+.addgrid .bit{width:var(--acell);height:calc(var(--acell)*1.12);font-size:calc(var(--acell)*.55)}
+.addgrid .pv{text-align:center;height:auto}
+.rowlab{font-weight:800;text-align:right;font-size:1.25rem;padding-right:.3rem}
+.carry{font-family:var(--mono);font-weight:800;color:var(--sign);text-align:center;font-size:1.15rem;height:1.5rem;line-height:1.5rem}
+.carry.c1{background:var(--sign-soft);border-radius:.3rem}
+.den{font-family:var(--mono);font-weight:700;font-size:1.15rem;white-space:nowrap;padding-left:.3rem}
+.rule{grid-column:2 / 11;border-top:3px solid var(--ink);height:0;margin:.15rem 0}
+.slot{width:var(--acell);height:calc(var(--acell)*1.12);border:2px dashed var(--line);border-radius:.55rem}
+.ovslot{border-color:var(--sign)}
+.ovtag{font-size:.65rem;font-weight:800;color:var(--sign);text-align:center;text-transform:uppercase;line-height:1.1}
+.cur{outline:3px solid var(--hi);outline-offset:2px;border-radius:.55rem}
+.bit.ovbit{background:var(--sign);border-color:var(--sign);color:#fff;opacity:.85}
+.rules{display:flex;gap:.4rem .9rem;flex-wrap:wrap;justify-content:center;margin-top:1.2rem;font-family:var(--mono);font-size:.95rem}
+.rules span{background:var(--surface2);border:1px solid var(--line);border-radius:.4rem;padding:.15rem .55rem}
+.rules span.on{background:var(--hi);border-color:#d6b21d;font-weight:800}
+.verdict{text-align:center;margin-top:1rem;font-size:1.1rem}
+.warnbox{display:inline-block;background:var(--bad-soft);border:2px solid var(--bad);color:#7a1810;border-radius:.6rem;padding:.45rem .9rem;font-weight:700}
+.okbox{display:inline-block;background:var(--ok-soft);border:2px solid var(--ok);color:#0d4a29;border-radius:.6rem;padding:.45rem .9rem;font-weight:700}
+
+/* ---------- shifts ---------- */
+.shift-row{display:flex;align-items:flex-end;justify-content:center;gap:.8rem;width:max-content;margin:0 auto}
+.bucket{width:4.4rem;min-height:calc(var(--cell)*1.18 + 1.6rem);border:2px dashed var(--line);border-radius:.6rem;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:.25rem;gap:.1rem;margin-bottom:1.25rem}
+.bucket .bl{font-size:.68rem;color:var(--muted);text-transform:uppercase;font-weight:800;letter-spacing:.04em;text-align:center;line-height:1.1}
+.bucket .lost{font-family:var(--mono);font-weight:800;font-size:1.2rem;line-height:1.1}
+.bucket .lost.l1{color:var(--bad)}
+.bucket .lost.l0{color:var(--muted)}
+.arrowin{font-size:.75rem;font-weight:800;color:#8a6d00;text-align:center;height:1rem;white-space:nowrap}
+.shift-vals{display:flex;gap:.6rem 2rem;justify-content:center;flex-wrap:wrap;margin-top:1rem;text-align:center}
+.shift-vals .lbl{font-size:.8rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.shift-vals .v{font-family:var(--mono);font-size:2rem;font-weight:800}
+.shift-vals .v.dim{color:var(--muted);font-size:1.5rem}
+.change{text-align:center;font-size:1.1rem;margin-top:.6rem;min-height:1.6em}
+.change b{font-family:var(--mono)}
+
+/* ---------- dock ---------- */
+#dock{position:sticky;bottom:0;z-index:25;background:var(--ink);color:#fff;padding:.7rem 1.1rem;font-size:1rem;min-height:3.6rem;display:flex;flex-direction:column;justify-content:center;gap:.45rem;box-shadow:0 -4px 14px rgba(0,0,0,.15)}
+html.presenter #dock{font-size:1.2rem;padding:.8rem 1.6rem}
+.badge{display:inline-block;font-size:.75em;font-weight:800;text-transform:uppercase;letter-spacing:.05em;background:var(--accent);color:#fff;border-radius:.35rem;padding:.1rem .45rem;margin-right:.45rem;vertical-align:.1em;white-space:nowrap}
+.badge.ch{background:#f2b705;color:#1b1b1b}
+.badge.warn{background:var(--bad)}
+.dock-row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+#dock input{font-family:var(--mono);font-size:1.05em;padding:.3rem .55rem;border-radius:.4rem;border:2px solid #fff;background:#fff;color:var(--ink);width:11rem}
+#dock .btn{color:var(--ink);min-height:2.1rem}
+#dock .btn.primary{color:#fff}
+.score{margin-left:auto;font-weight:800;color:#ffe27a;white-space:nowrap}
+.fb .mark{font-weight:800;margin-right:.3rem}
+.fb.ok .mark{color:#7ee2a8} .fb.bad .mark{color:#ffb4a8}
+.opt{border:2px solid #fff;background:transparent;color:#fff;border-radius:.5rem;padding:.3rem .9rem;cursor:pointer;font-weight:700}
+.opt:hover{background:rgba(255,255,255,.12)}
+.opt.right{background:#1f9d57;border-color:#1f9d57}
+.opt.wrong{background:#c0392b;border-color:#c0392b}
+.opt.dim{opacity:.5}
+.dock-hint{font-size:.8em;color:#b8c0d4}
+#dock code{background:rgba(255,255,255,.12);padding:0 .3rem;border-radius:.25rem}
+
+/* ---------- side panel ---------- */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:.9rem;position:sticky;top:4.6rem;max-height:calc(100vh - 10rem);overflow:auto}
+@media (max-width:1180px){.panel{position:static;max-height:none}}
+.tabs{display:flex;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface);z-index:2;border-radius:.9rem .9rem 0 0}
+.tab{flex:1;border:0;background:transparent;padding:.7rem .4rem;cursor:pointer;font-weight:700;color:var(--muted);border-bottom:3px solid transparent}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tabpanel{padding:.9rem 1.1rem 1.2rem;font-size:.95rem}
+.tabpanel p{margin:.45rem 0}
+.tabpanel ul,.tabpanel ol{padding-left:1.25rem;margin:.4rem 0}
+.tabpanel li{margin:.2rem 0}
+.tip{border-left:4px solid var(--accent);background:var(--accent-soft);padding:.55rem .75rem;border-radius:.4rem;margin:.8rem 0}
+.tip.exam{border-left-color:var(--hexc);background:var(--data-soft)}
+.tip-title{display:block;font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.15rem}
+.tbl{width:100%;border-collapse:collapse;font-size:.88rem;margin:.4rem 0}
+.tbl th,.tbl td{border:1px solid var(--line);padding:.28rem .45rem;text-align:left;vertical-align:top}
+.tbl th{background:var(--surface2)}
+.tbl td.m{font-family:var(--mono)}
+.tbl tr.yes td{background:var(--accent-soft)}
+.q{border:1px solid var(--line);border-radius:.6rem;padding:.65rem .75rem;margin:.6rem 0}
+.q p{margin:0 0 .45rem;font-weight:700}
+.qopts{display:flex;flex-direction:column;gap:.3rem}
+.qopt{text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:.45rem;padding:.35rem .6rem;cursor:pointer}
+.qopt:hover{background:var(--surface2)}
+.qopt.right{background:var(--ok-soft);border-color:var(--ok);font-weight:700}
+.qopt.wrong{background:var(--bad-soft);border-color:var(--bad)}
+.qwhy{font-size:.88rem;margin-top:.4rem;color:var(--muted)}
+
+dialog{border:0;border-radius:.9rem;padding:1.1rem 1.3rem;max-width:min(36rem,calc(100vw - 2rem));box-shadow:0 12px 40px rgba(0,0,0,.3);color:var(--ink);background:var(--surface)}
+dialog::backdrop{background:rgba(15,20,30,.45)}
+dialog h2{margin-top:0}
+dialog menu{display:flex;justify-content:flex-end;gap:.5rem;padding:0;margin:1rem 0 0}
+.keys{width:100%;border-collapse:collapse;font-size:.9rem}
+.keys td{padding:.25rem .3rem;border-bottom:1px solid var(--line)}
+.keys td:first-child{white-space:nowrap;width:40%}
+
+html.presenter .topbar{font-size:.82rem;padding:.4rem 1.2rem}
+html.presenter .brand span{display:none}
+@media (max-width:600px){
+  :root{--cell:2.35rem;--acell:1.75rem;--cg:.2rem;--ng:.5rem}
+  .topbar{padding:.5rem .75rem}
+  .layout{padding:.6rem}
+  .stage{padding:.9rem .7rem 1.2rem}
+  .big{font-size:2rem}
+  .addgrid{grid-template-columns:2.2rem repeat(9,var(--acell)) .4rem minmax(4rem,auto);column-gap:.2rem}
+  .addgrid .pv{font-size:.6rem}
+  .addgrid .rowlab{font-size:.95rem;white-space:nowrap;padding-right:.1rem}
+  .addgrid .den{font-size:.8rem;padding-left:0}
+  .bucket{width:2.6rem}
+  .shift-row{gap:.3rem}
+  .pv{font-size:.7rem}
+  .btn .lbl{display:none}
+  .ctl .sep{display:none}
+}
+@media (prefers-reduced-motion:reduce){.bit.flash{animation:none}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><h1>Binary register playground</h1><span>GCSE Computer Science · Edexcel 2.1.1–2.1.5</span></div>
+  <div class="seg tools" role="group" aria-label="Choose a tool">
+    <button data-tool="convert" title="Binary and denary (1)">1 · Convert</button>
+    <button data-tool="add" title="Binary addition and overflow (2)">2 · Add</button>
+    <button data-tool="shift" title="Logical and arithmetic shifts (3)">3 · Shift</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="group" role="group" aria-label="Options">
+    <button class="btn" id="tgSigned" aria-pressed="false" title="Read the register as two's complement (S)">Two’s complement</button>
+    <button class="btn" id="tgHex" aria-pressed="false" title="Show hexadecimal (H)">Hex</button>
+    <button class="btn" id="tgChal" aria-pressed="false" title="Practice questions (Q)">Challenge</button>
+    <button class="btn" id="tgMode" aria-pressed="false" title="Switch between revision and presenter mode (P)">Presenter mode</button>
+    <button class="btn icon" id="btnFull" title="Full screen (F)" aria-label="Full screen">⛶</button>
+    <button class="btn icon" id="btnHelp" title="Help and keyboard shortcuts (?)" aria-label="Help">?</button>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="stage" id="stage" aria-live="off"></section>
+  <aside class="panel" id="panel" aria-label="Explanation">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="t-how" aria-selected="true" aria-controls="p-how">How it works</button>
+      <button class="tab" role="tab" id="t-ideas" aria-selected="false" aria-controls="p-ideas">Key ideas</button>
+      <button class="tab" role="tab" id="t-quiz" aria-selected="false" aria-controls="p-quiz">Check yourself</button>
+    </div>
+    <div class="tabpanel" role="tabpanel" id="p-how" aria-labelledby="t-how"></div>
+    <div class="tabpanel" role="tabpanel" id="p-ideas" aria-labelledby="t-ideas" hidden></div>
+    <div class="tabpanel" role="tabpanel" id="p-quiz" aria-labelledby="t-quiz" hidden></div>
+  </aside>
+</main>
+
+<div id="dock" aria-live="polite"></div>
+
+<dialog id="helpDlg">
+  <h2>How to use this playground</h2>
+  <p>An 8-bit register is a row of 8 bits. Click any bit to switch it between 0 and 1.</p>
+  <ul>
+    <li><b>Convert</b> – binary ↔ denary, number of patterns, two’s complement.</li>
+    <li><b>Add</b> – add two binary numbers column by column and see overflow happen.</li>
+    <li><b>Shift</b> – logical and arithmetic shifts, left and right.</li>
+    <li><b>Challenge</b> – practice questions on the current tool.</li>
+    <li><b>Presenter mode</b> hides the explanations and makes everything bigger for a projector.</li>
+  </ul>
+  <table class="keys">
+    <tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></td><td>Convert / Add / Shift</td></tr>
+    <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>Convert: add or take away 1</td></tr>
+    <tr><td><kbd>Space</kbd></td><td>Add: next column · Challenge: reveal / next question</td></tr>
+    <tr><td><kbd>N</kbd></td><td>Add: do all columns</td></tr>
+    <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Shift: shift left / right</td></tr>
+    <tr><td><kbd>Z</kbd></td><td>Shift: undo</td></tr>
+    <tr><td><kbd>R</kbd></td><td>Reset the current tool</td></tr>
+    <tr><td><kbd>S</kbd></td><td>Two’s complement on / off</td></tr>
+    <tr><td><kbd>H</kbd></td><td>Hex on / off</td></tr>
+    <tr><td><kbd>Q</kbd></td><td>Challenge on / off</td></tr>
+    <tr><td><kbd>P</kbd></td><td>Presenter / revision mode</td></tr>
+    <tr><td><kbd>F</kbd></td><td>Full screen</td></tr>
+  </table>
+  <p style="font-size:.85rem;color:var(--muted)">Click once on the page first so it receives key presses.</p>
+  <form method="dialog"><menu><button class="btn primary">Close</button></menu></form>
+</dialog>
+
+<noscript><p style="padding:1rem">This simulation needs JavaScript to run.</p></noscript>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+/* ---------- binary helpers ---------- */
+const mask = w => (1 << w) - 1;
+const toSigned = (v, w) => v >= (1 << (w - 1)) ? v - (1 << w) : v;
+const bstr = (v, w = 8) => v.toString(2).padStart(w, '0');
+const bsp = (v, w = 8) => { const s = bstr(v, w); let out = ''; for (let i = 0; i < s.length; i++) { if (i && (s.length - i) % 4 === 0) out += ' '; out += s[i]; } return out; };
+const hex = (v, w = 8) => v.toString(16).toUpperCase().padStart(Math.ceil(w / 4), '0');
+const sgn = n => n > 0 ? '+' + n : String(n);
+const MINUS = '−';
+const fmt = n => n < 0 ? MINUS + (-n) : String(n);
+
+/* ---------- state ---------- */
+const settings = Object.assign({ tool: 'convert', signed: false, hex: false, presenter: false }, store.get('binSim.v1', {}));
+if (!['convert', 'add', 'shift'].includes(settings.tool)) settings.tool = 'convert';
+const save = () => store.set('binSim.v1', settings);
+
+const conv = { w: 8, v: 0b01001010, flash: [] };
+const add = { a: 0b01101001, b: 0b00111010, col: 0, res: [], cin: [0], hide: false };
+const sh = { v: 0b00101101, type: 'logical', hist: [], lostL: [], lostR: [], net: 0, last: null, start: 0b00101101, incoming: null };
+let dockMsg = null, busy = false;
+// In a Convert challenge the question decides whether the register is read as signed.
+const signedView = () => (chal.on && chal.q && chal.q.tool === 'convert') ? !!chal.q.signed : settings.signed;
+let chal = { on: false, q: null, answered: false, correct: null, given: null, right: 0, total: 0 };
+
+/* ---------- register markup ---------- */
+// Bits are grouped in 4s from the right (nibbles), so a hex digit can sit under each group.
+function regHTML(v, w, o = {}) {
+  const groups = [];
+  for (let end = w; end > 0; end -= 4) groups.unshift([Math.max(0, end - 4), end]);
+  const s = bstr(v, w), flash = new Set(o.flash || []);
+  const useGroups = o.groups !== false;
+  let h = `<div class="reg" data-reg="${o.id}">`;
+  const gl = useGroups ? groups : [[0, w]];
+  for (const [a, b] of gl) {
+    h += `<div class="nib"><div class="nib-bits">`;
+    for (let i = a; i < b; i++) {
+      const p = w - 1 - i, bit = +s[i], neg = o.signed && i === 0;
+      const pv = (neg ? MINUS : '') + (1 << p);
+      const cls = `bit b${bit}${neg ? ' sign' : ''}${flash.has(p) ? ' flash' : ''}${o.incoming === p ? ' incoming' : ''}${o.hide ? ' hidebit' : ''}`;
+      h += `<div class="colb">${o.noPv ? '' : `<div class="pv${neg ? ' neg' : ''}">${pv}</div>`}<button class="${cls}" data-p="${p}" ${o.editable ? '' : 'disabled'} aria-label="Bit worth ${pv}: ${o.hide ? 'hidden' : bit}">${bit}</button>${o.under ? `<div class="under">${neg ? 'sign bit' : (o.arrowAt === p ? o.arrowText : '')}</div>` : ''}</div>`;
+    }
+    h += `</div>`;
+    if (o.hex && useGroups) { const gv = parseInt(s.slice(a, b), 2); h += `<div class="hexlab">${o.hide ? '?' : gv.toString(16).toUpperCase()}</div>`; }
+    h += `</div>`;
+  }
+  return h + '</div>';
+}
+
+/* ==================== CONVERT ==================== */
+function convValue() { return signedView() ? toSigned(conv.v, conv.w) : conv.v; }
+function convTerms() {
+  const s = bstr(conv.v, conv.w), t = [];
+  for (let i = 0; i < conv.w; i++) if (s[i] === '1') { const p = conv.w - 1 - i; t.push(signedView() && i === 0 ? MINUS + (1 << p) : String(1 << p)); }
+  return t;
+}
+function renderConvert() {
+  const w = conv.w, n = 1 << w, signed = signedView(), hide = chal.on && chal.q && !chal.answered && chal.q.hideReadout;
+  const range = signed ? `${fmt(-(n / 2))} to +${n / 2 - 1}` : `0 to ${n - 1}`;
+  const terms = convTerms(), val = convValue();
+  const work = terms.length ? terms.join(' + ').replace(/\+ −/g, MINUS + ' ') : 'no 1s';
+  let alt = '';
+  if (signed) alt = `As an unsigned number it would be <b>${conv.v}</b>.`;
+  else if (conv.v >= n / 2) alt = `<span class="rev-only">As a two’s complement number it would be <b>${fmt(toSigned(conv.v, w))}</b>.</span>`;
+  return `
+  <div class="tool-head"><div><h2>Binary ↔ denary</h2><div class="sub">Click the bits, or type a denary number.</div></div>
+    <div class="seg" role="group" aria-label="How to read the register">
+      <button data-signed="0" aria-pressed="${!signed}">Unsigned</button><button data-signed="1" aria-pressed="${signed}">Two’s complement</button></div></div>
+  <div class="states"><span class="stepper">Bits: <button class="btn" data-act="wdown" aria-label="Fewer bits" ${w <= 1 ? 'disabled' : ''}>−</button><span class="pill">${w}</span><button class="btn" data-act="wup" aria-label="More bits" ${w >= 8 ? 'disabled' : ''}>+</button></span>
+    <span>${w} bit${w > 1 ? 's' : ''} → 2<sup>${w}</sup> = <b>${n}</b> different patterns</span><span>Range: <b>${range}</b></span></div>
+  <div class="regwrap">${regHTML(conv.v, w, { id: 'conv', editable: !busy, signed, flash: conv.flash, hex: settings.hex, under: signed })}</div>
+  <div class="readout">
+    <div class="big">${hide ? '= ?' : '= ' + fmt(val)}</div>
+    <div class="work">${hide ? '&nbsp;' : work}</div>
+    ${hide ? '' : `<div class="alt">${alt}</div>`}
+    ${settings.hex && !hide ? `<div class="hexline">Hex: ${hex(conv.v, w)}</div>` : ''}
+  </div>
+  <div class="ctl">
+    <button class="btn" data-act="dec" title="Take away 1 (↓)" ${busy ? 'disabled' : ''}>− 1</button>
+    <button class="btn" data-act="inc" title="Add 1 (↑)" ${busy ? 'disabled' : ''}>+ 1</button>
+    <span class="sep"></span>
+    <label class="sr" for="denIn" style="font-size:.85rem;color:var(--muted)">Denary</label>
+    <input id="denIn" inputmode="numeric" placeholder="${signed ? 'e.g. −42' : 'e.g. 42'}" aria-label="Type a denary number">
+    <button class="btn" data-act="set" ${busy ? 'disabled' : ''}>Show in binary</button>
+    <span class="sep"></span>
+    ${signed ? `<button class="btn" data-act="negate" title="Flip all the bits, then add 1" ${busy ? 'disabled' : ''}>Make negative / positive</button>` : ''}
+    <button class="btn" data-act="clear" ${busy ? 'disabled' : ''}>Clear</button>
+    <button class="btn" data-act="random" ${busy ? 'disabled' : ''}>Random</button>
+  </div>`;
+}
+function convSetMsg(text, badge = 'Convert', warn = false) { dockMsg = { badge, text, warn }; }
+function convBitClick(p) {
+  conv.v ^= (1 << p); conv.flash = [p];
+  const on = (conv.v >> p) & 1, neg = signedView() && p === conv.w - 1;
+  convSetMsg(`The bit worth <b>${neg ? MINUS : ''}${1 << p}</b> is now ${on ? 'on' : 'off'}. The register holds <code>${bsp(conv.v, conv.w)}</code>${chal.on ? '' : ` = <b>${fmt(convValue())}</b>`}.`);
+}
+function convStep(d) {
+  if (busy) return;
+  const w = conv.w, n = 1 << w, before = convValue();
+  conv.v = (conv.v + d + n) & mask(w);
+  const after = convValue();
+  const changed = []; for (let p = 0; p < w; p++) if (((conv.v ^ (conv.v - d + n)) >> p) & 1) changed.push(p);
+  conv.flash = changed;
+  if (Math.abs(after - before) !== 1) {
+    convSetMsg(`<b>Overflow!</b> ${fmt(before)} ${d > 0 ? '+' : MINUS} 1 = ${fmt(before + d)}, which can’t be stored in ${w} bits (range ${signedView() ? fmt(-(n / 2)) + ' to +' + (n / 2 - 1) : '0 to ' + (n - 1)}). The register wraps round to <b>${fmt(after)}</b>.`, 'Overflow', true);
+  } else convSetMsg(`${fmt(before)} ${d > 0 ? '+' : MINUS} 1 = <b>${fmt(after)}</b>. Watch how the bits change: ${d > 0 ? 'adding 1 flips the rightmost 0 to 1 and any 1s to its right back to 0' : 'taking away 1 flips the rightmost 1 to 0 and any 0s to its right to 1'}.`);
+}
+function convSet() {
+  const raw = ($('#denIn').value || '').trim().replace(MINUS, '-').replace(/^\+/, '');
+  if (!/^-?\d+$/.test(raw)) { convSetMsg('Type a whole number first.', 'Convert', true); return; }
+  const x = parseInt(raw, 10), w = conv.w, n = 1 << w;
+  const lo = signedView() ? -(n / 2) : 0, hi = signedView() ? n / 2 - 1 : n - 1;
+  if (x < lo || x > hi) {
+    convSetMsg(`<b>${fmt(x)}</b> can’t be stored in ${w} bits${signedView() ? ' using two’s complement' : ''} – the range is ${fmt(lo)} to ${hi}.${!signedView() && x < 0 ? ' Turn on <b>Two’s complement</b> to store negative numbers.' : ''}`, 'Too big', true);
+    return;
+  }
+  conv.v = (x + n) & mask(w); conv.flash = [...Array(w).keys()];
+  convSetMsg(`${fmt(x)} in binary is <code>${bsp(conv.v, w)}</code>. See <b>How it works</b> for the method.`);
+}
+function convNegate() {
+  if (busy || !signedView()) return;
+  const w = conv.w, before = toSigned(conv.v, w), flipped = (~conv.v) & mask(w), result = (flipped + 1) & mask(w);
+  busy = true;
+  conv.v = flipped; conv.flash = [...Array(w).keys()];
+  convSetMsg(`<b>Step 1:</b> flip every bit (0 → 1, 1 → 0): <code>${bsp(flipped, w)}</code>`, 'Two’s complement');
+  render();
+  setTimeout(() => {
+    const changed = []; for (let p = 0; p < w; p++) if (((flipped ^ result) >> p) & 1) changed.push(p);
+    conv.v = result; conv.flash = changed; busy = false;
+    const after = toSigned(result, w);
+    const odd = before === -(1 << (w - 1));
+    convSetMsg(`<b>Step 2:</b> add 1: <code>${bsp(flipped, w)}</code> + 1 = <code>${bsp(result, w)}</code>. So ${fmt(before)} became <b>${fmt(after)}</b>.` +
+      (odd ? ` (${fmt(before)} has no positive partner in ${w} bits, so it stays the same – an overflow.)` : ''), 'Two’s complement');
+    render();
+  }, reduceMotion ? 300 : 1300);
+}
+function convHow() {
+  const w = conv.w, signed = signedView(), val = convValue(), n = 1 << w;
+  let h = `<h2>Binary ↔ denary</h2>
+  <p>Each bit has a <b>place value</b>. Starting from the right they are 1, 2, 4, 8, 16, 32, 64, 128 – each one is double the one before.</p>`;
+  if (chal.on && chal.q && !chal.answered) return h + `<div class="tip"><span class="tip-title">Challenge</span>Answer the question in the bar at the bottom. You can click the bits as rough working.</div>`;
+  h += `<h3>Binary → denary</h3><p>Add up the place values that have a 1 under them:</p><p style="font-family:var(--mono);font-size:1.05rem"><b>${convTerms().join(' + ').replace(/\+ −/g, MINUS + ' ') || '0'} = ${fmt(val)}</b></p>`;
+  h += `<h3>Denary → binary</h3>`;
+  if (signed && val < 0) {
+    const pos = -val, pb = pos & mask(w), fl = (~pb) & mask(w);
+    h += `<p>For a negative number, use the <b>flip and add 1</b> method:</p><ol>
+      <li>Write <b>${pos}</b> in binary: <code>${bsp(pb, w)}</code></li>
+      <li>Flip every bit: <code>${bsp(fl, w)}</code></li>
+      <li>Add 1: <code><b>${bsp((fl + 1) & mask(w), w)}</b></code></li></ol>
+      <p>Check: the leftmost bit is worth ${MINUS}${1 << (w - 1)}, so ${MINUS}${1 << (w - 1)} + ${val + (1 << (w - 1))} = ${val}. ✓</p>`;
+  } else {
+    h += `<p>Work from the left. If the place value fits into what is left, write a 1 and take it away; if not, write a 0.</p><table class="tbl"><tr><th>Place value</th><th>Fits into ${val}?</th><th>Bit</th><th>Left</th></tr>`;
+    let rem = val;
+    for (let p = w - 1; p >= 0; p--) {
+      const pv = 1 << p, fits = signed && p === w - 1 ? false : pv <= rem;
+      if (fits) rem -= pv;
+      h += `<tr class="${fits ? 'yes' : ''}"><td class="m">${signed && p === w - 1 ? MINUS : ''}${pv}</td><td>${signed && p === w - 1 ? 'Positive, so 0' : fits ? 'Yes' : 'No'}</td><td class="m"><b>${fits ? 1 : 0}</b></td><td class="m">${rem}</td></tr>`;
+    }
+    h += `</table>`;
+  }
+  h += `<h3>How many patterns?</h3><p>Each extra bit doubles the number of patterns. With <b>${w}</b> bit${w > 1 ? 's' : ''} there are 2<sup>${w}</sup> = <b>${n}</b>. Try the <b>−</b> and <b>+</b> buttons next to “Bits”.</p>`;
+  if (signed) h += `<div class="tip"><span class="tip-title">Two’s complement</span>The leftmost bit is worth <b>${MINUS}${1 << (w - 1)}</b> instead of +${1 << (w - 1)}. If it is 1, the number is negative. Range: ${fmt(-(n / 2))} to +${n / 2 - 1}.</div>`;
+  else h += `<div class="tip"><span class="tip-title">Try this</span>Turn on <b>Two’s complement</b> to see how the same bits can stand for a negative number.</div>`;
+  if (settings.hex) h += `<div class="tip exam"><span class="tip-title">Hex</span>Each group of 4 bits (a nibble) is one hex digit, 0–F. <code>${bsp(conv.v, w)}</code> = <b>${hex(conv.v, w)}</b>.</div>`;
+  return h;
+}
+
+/* ==================== ADD ==================== */
+function addReset(keepNums = true) { add.col = 0; add.res = []; add.cin = [0]; }
+function addStep() {
+  if (add.col >= 8) return false;
+  const k = add.col, a = (add.a >> k) & 1, b = (add.b >> k) & 1, c = add.cin[k], s = a + b + c;
+  add.res[k] = s & 1; add.cin[k + 1] = s >> 1; add.col++;
+  const parts = [a, b].concat(c ? ['carry 1'] : []).join(' + ');
+  let msg = `Column worth <b>${1 << k}</b>: ${parts} = ${s}, which is <code>${s.toString(2)}</code> in binary → write <b>${s & 1}</b>${s >> 1 ? ', <b>carry 1</b>' : ', no carry'}.`;
+  if (add.col === 8) {
+    const total = add.a + add.b;
+    msg += total > 255 ? ` <b>Overflow!</b> The carry has nowhere to go – the answer ${total} needs 9 bits, so the register holds ${total & 255}.` : ` Done: ${add.a} + ${add.b} = <b>${total}</b>.`;
+  }
+  dockMsg = { badge: add.col === 8 && add.a + add.b > 255 ? 'Overflow' : `Column ${k + 1} of 8`, text: msg, warn: add.col === 8 && add.a + add.b > 255 };
+  return true;
+}
+function addAll(animate) {
+  if (busy) return;
+  if (!animate || reduceMotion) { while (addStep()); render(); return; }
+  busy = true;
+  const tick = () => { if (addStep()) { render(); setTimeout(tick, 380); } else { busy = false; render(); } };
+  tick();
+}
+function renderAdd() {
+  const hideRes = chal.on && chal.q && !chal.answered && chal.q.tool === 'add';
+  const done = add.col, total = add.a + add.b, finished = done === 8, cur = done - 1;
+  let h = `<div class="tool-head"><div><h2>Binary addition</h2><div class="sub">Set the bits of A and B, then add them one column at a time, starting from the right.</div></div></div>
+  <div class="addwrap"><div class="addgrid">`;
+  // place values
+  h += `<div></div><div class="ovtag">no room</div>`;
+  for (let p = 7; p >= 0; p--) h += `<div class="pv">${1 << p}</div>`;
+  h += `<div></div><div></div>`;
+  // carry row
+  h += `<div class="rowlab" style="font-size:.75rem;color:var(--sign)">carry</div>`;
+  for (let p = 8; p >= 0; p--) { const show = p > 0 && p <= done && add.cin[p]; h += `<div class="carry${show ? ' c1' : ''}">${show ? 1 : ''}</div>`; }
+  h += `<div></div><div></div>`;
+  const row = (lab, v, key) => {
+    let r = `<div class="rowlab">${lab}</div><div></div>`;
+    for (let p = 7; p >= 0; p--) { const b = (v >> p) & 1; r += `<button class="bit b${b}${p === cur ? ' cur' : ''}" data-row="${key}" data-p="${p}" ${busy || hideRes ? 'disabled' : ''} aria-label="${lab} bit worth ${1 << p}: ${b}">${b}</button>`; }
+    return r + `<div></div><div class="den">= ${v}</div>`;
+  };
+  h += row('A', add.a, 'a') + row('+ B', add.b, 'b');
+  h += `<div></div><div class="rule"></div><div></div><div></div>`;
+  // result row
+  h += `<div class="rowlab">=</div>`;
+  if (finished && add.cin[8]) h += `<div class="bit b1 ovbit" aria-label="Overflow bit">1</div>`; else h += `<div class="slot ovslot" aria-hidden="true"></div>`;
+  for (let p = 7; p >= 0; p--) {
+    if (p < done) h += `<div class="bit b${add.res[p]}${p === cur ? ' cur' : ''}" role="img" aria-label="Result bit worth ${1 << p}: ${add.res[p]}">${add.res[p]}</div>`;
+    else h += `<div class="slot" aria-hidden="true"></div>`;
+  }
+  h += `<div></div><div class="den">${finished ? '= ' + (total & 255) : ''}</div>`;
+  h += `</div></div>`;
+  // verdict
+  if (finished) {
+    h += `<div class="verdict">${total > 255
+      ? `<span class="warnbox">Overflow! ${add.a} + ${add.b} = ${total}, but 8 bits can only hold up to 255. The 9th bit is lost, so the register holds ${total & 255}.</span>`
+      : `<span class="okbox">${add.a} + ${add.b} = ${total} ✓ – it fits in 8 bits.</span>`}</div>`;
+  }
+  const k = done - 1, a = k >= 0 ? (add.a >> k) & 1 : null, b = k >= 0 ? (add.b >> k) & 1 : null, s = k >= 0 ? a + b + add.cin[k] : -1;
+  h += `<div class="rules" aria-label="Rules of binary addition">
+    <span class="${s === 0 ? 'on' : ''}">0 + 0 = 0</span><span class="${s === 1 ? 'on' : ''}">0 + 1 = 1</span>
+    <span class="${s === 2 ? 'on' : ''}">1 + 1 = 10 → 0 carry 1</span><span class="${s === 3 ? 'on' : ''}">1 + 1 + 1 = 11 → 1 carry 1</span></div>`;
+  h += `<div class="ctl">
+    <button class="btn primary" data-act="astep" title="Next column (Space)" ${busy || finished || hideRes ? 'disabled' : ''}>Next column ▶</button>
+    <button class="btn" data-act="aall" title="Add every column (N)" ${busy || finished || hideRes ? 'disabled' : ''}>Add all ⏭</button>
+    <button class="btn" data-act="areset" title="Start again (R)" ${busy || hideRes ? 'disabled' : ''}>↺ Start again</button>
+    <span class="sep"></span>
+    <button class="btn" data-act="arandom" ${busy || hideRes ? 'disabled' : ''}>Random numbers</button>
+    <button class="btn" data-act="aover" ${busy || hideRes ? 'disabled' : ''}>Overflow example</button>
+  </div>`;
+  return h;
+}
+function addHow() {
+  let h = `<h2>Binary addition</h2>
+  <p>Add binary the same way as column addition in denary, starting from the <b>right</b>. There are only four possible sums:</p>
+  <table class="tbl"><tr><th>Sum</th><th>Binary</th><th>Write</th><th>Carry</th></tr>
+  <tr><td class="m">0 + 0</td><td class="m">0</td><td class="m">0</td><td>–</td></tr>
+  <tr><td class="m">0 + 1</td><td class="m">1</td><td class="m">1</td><td>–</td></tr>
+  <tr><td class="m">1 + 1</td><td class="m">10</td><td class="m">0</td><td>1</td></tr>
+  <tr><td class="m">1 + 1 + 1</td><td class="m">11</td><td class="m">1</td><td>1</td></tr></table>
+  <h3>Overflow</h3>
+  <p>An 8-bit register can only hold 0 to 255. If the answer is bigger, there is a carry out of the leftmost column with nowhere to go. That 9th bit is lost and the answer stored is wrong. This is called <b>overflow</b>.</p>
+  <div class="tip"><span class="tip-title">Try this</span>Press <b>Overflow example</b>, then step through it. Watch the final carry fall into the “no room” box.</div>
+  <div class="tip exam"><span class="tip-title">Exam tip</span>Write your carries clearly above the columns, and always give your answer as 8 bits. If a carry comes out of the last column, say that <b>overflow</b> has occurred.</div>`;
+  return h;
+}
+
+/* ==================== SHIFT ==================== */
+function shiftCalc(v, dir, type) {
+  const msb = (v >> 7) & 1, lsb = v & 1;
+  if (dir === 'L') return { nv: (v << 1) & 255, lost: msb, inBit: 0 };
+  const inBit = type === 'arith' ? msb : 0;
+  return { nv: (v >> 1) | (inBit << 7), lost: lsb, inBit };
+}
+function shiftExplain(before, dir, type, r) {
+  const u0 = before, u1 = r.nv, s0 = toSigned(u0, 8), s1 = toSigned(u1, 8), name = type === 'arith' ? 'Arithmetic' : 'Logical';
+  if (dir === 'L') {
+    if (type === 'logical') return `${name} shift left: every bit moves one place left and a <b>0</b> fills the gap on the right. ${u0} → <b>${u1}</b>. ` +
+      (r.lost ? `A <b>1</b> fell off the left end, so the answer is wrong (${u0} × 2 = ${u0 * 2} needs 9 bits). This is <b>overflow</b>.` : `A shift left multiplies by 2.`);
+    const signChanged = ((u0 ^ u1) >> 7) & 1;
+    return `${name} shift left: works just like a logical shift left – bits move left and a <b>0</b> fills the gap. ` +
+      (signChanged ? `But the <b>sign bit changed</b>, so ${fmt(s0)} became ${fmt(s1)} – the answer is wrong. This is <b>overflow</b>.` : `${fmt(s0)} → <b>${fmt(s1)}</b> (× 2).`);
+  }
+  if (type === 'logical') return `${name} shift right: every bit moves one place right and a <b>0</b> fills the gap on the left. ${u0} → <b>${u1}</b>. ` +
+    (r.lost ? `The <b>1</b> that fell off the right is lost, so the answer is rounded down (${u0} ÷ 2 = ${u0 / 2}).` : `A shift right divides by 2.`) +
+    ((u0 >> 7) & 1 ? ` As two’s complement, ${fmt(s0)} became ${fmt(s1)} – a logical shift does <b>not</b> keep a negative number negative.` : '');
+  return `${name} shift right: bits move right and the <b>sign bit is copied</b> into the gap on the left, so the sign stays the same. ${fmt(s0)} → <b>${fmt(s1)}</b> (÷ 2${r.lost ? ', rounded down' : ''}).`;
+}
+function animateShift(dir, done) {
+  const cells = [...document.querySelectorAll('[data-reg="shift"] .bit')];
+  if (reduceMotion || cells.length !== 8) { done(); return; }
+  const rects = cells.map(c => c.getBoundingClientRect()), step = rects[1].left - rects[0].left;
+  cells.forEach((c, i) => {
+    const dx = dir === 'L' ? -step : step, leaving = (dir === 'L' && i === 0) || (dir === 'R' && i === 7);
+    c.style.transition = 'transform .38s ease-in-out, opacity .38s';
+    c.style.transform = `translateX(${dx}px)${leaving ? ' translateY(1.2rem) rotate(' + (dir === 'L' ? '-' : '') + '20deg)' : ''}`;
+    if (leaving) c.style.opacity = '0';
+    c.style.zIndex = '2';
+  });
+  setTimeout(done, 400);
+}
+function doShift(dir, then) {
+  if (busy) return;
+  const res = shiftCalc(sh.v, dir, sh.type);
+  busy = true;
+  sh.hist.push({ v: sh.v, lostL: sh.lostL.slice(), lostR: sh.lostR.slice(), net: sh.net, last: sh.last, incoming: sh.incoming });
+  const before = sh.v;
+  animateShift(dir, () => {
+    sh.v = res.nv; sh.net += dir === 'L' ? 1 : -1;
+    (dir === 'L' ? sh.lostL : sh.lostR).push(res.lost);
+    sh.incoming = dir === 'L' ? 0 : 7;
+    sh.last = { dir, before, after: res.nv, lost: res.lost, inBit: res.inBit, type: sh.type };
+    const ovf = (dir === 'L' && ((sh.type === 'logical' && res.lost) || (sh.type === 'arith' && ((before ^ res.nv) >> 7) & 1)));
+    dockMsg = { badge: ovf ? 'Overflow' : `${sh.type === 'arith' ? 'Arithmetic' : 'Logical'} shift ${dir === 'L' ? 'left' : 'right'}`, text: shiftExplain(before, dir, sh.type, res), warn: ovf };
+    busy = false; render();
+    if (then) then();
+  });
+}
+function shiftUndo() {
+  if (busy || !sh.hist.length) return;
+  Object.assign(sh, sh.hist.pop());
+  dockMsg = { badge: 'Undo', text: 'Went back one shift.' }; render();
+}
+function shiftResetTo(v) { sh.v = v; sh.start = v; sh.hist = []; sh.lostL = []; sh.lostR = []; sh.net = 0; sh.last = null; sh.incoming = null; }
+function renderShift() {
+  const hide = chal.on && chal.q && !chal.answered && chal.q.tool === 'shift';
+  const u = sh.v, s = toSigned(u, 8), primarySigned = sh.type === 'arith' || settings.signed;
+  const lastIn = sh.last && sh.incoming != null ? (sh.last.dir === 'L' ? 'new 0' : sh.last.type === 'arith' ? 'sign copy' : 'new 0') : '';
+  const bucket = (arr, side) => `<div class="bucket" aria-label="Bits lost off the ${side}"><div class="bl">lost ${side === 'left' ? '←' : '→'}</div>${arr.slice(-4).map(b => `<span class="lost l${b}">${b}</span>`).join('')}</div>`;
+  let h = `<div class="tool-head"><div><h2>Binary shifts</h2><div class="sub">Every bit moves one place. Choose the type of shift, then shift left or right.</div></div>
+    <div class="seg" role="group" aria-label="Type of shift"><button data-type="logical" aria-pressed="${sh.type === 'logical'}">Logical</button><button data-type="arith" aria-pressed="${sh.type === 'arith'}">Arithmetic</button></div></div>
+  <div class="regwrap"><div class="shift-row">${bucket(sh.lostL, 'left')}
+    ${regHTML(u, 8, { id: 'shift', editable: !busy && !hide, signed: primarySigned, groups: false, incoming: sh.incoming, under: true, arrowAt: sh.incoming, arrowText: lastIn })}
+    ${bucket(sh.lostR, 'right')}</div></div>
+  <div class="shift-vals">
+    <div><div class="lbl">Unsigned</div><div class="v${primarySigned ? ' dim' : ''}">${u}</div></div>
+    <div><div class="lbl">Two’s complement</div><div class="v${primarySigned ? '' : ' dim'}">${fmt(s)}</div></div>
+    ${settings.hex ? `<div><div class="lbl">Hex</div><div class="v dim" style="color:var(--hexc)">${hex(u)}</div></div>` : ''}
+  </div>`;
+  let change = '';
+  if (sh.last && !hide) {
+    const L = sh.last, a = primarySigned ? fmt(toSigned(L.before, 8)) : L.before, b = primarySigned ? fmt(toSigned(L.after, 8)) : L.after;
+    change = `Last shift: <b>${a}</b> → <b>${b}</b>`;
+    if (sh.net) change += ` · Since the start: ${Math.abs(sh.net)} place${Math.abs(sh.net) > 1 ? 's' : ''} ${sh.net > 0 ? 'left' : 'right'} = ${sh.net > 0 ? '×' : '÷'} ${1 << Math.abs(sh.net)}`;
+  }
+  h += `<div class="change">${change}</div>
+  <div class="ctl">
+    <button class="btn primary" data-act="sl" title="Shift left (←)" ${busy || hide ? 'disabled' : ''}>◀ Shift left</button>
+    <button class="btn primary" data-act="sr" title="Shift right (→)" ${busy || hide ? 'disabled' : ''}>Shift right ▶</button>
+    <span class="sep"></span>
+    <button class="btn" data-act="sundo" title="Undo (Z)" ${busy || hide || !sh.hist.length ? 'disabled' : ''}>Undo</button>
+    <button class="btn" data-act="sreset" title="Back to the starting value (R)" ${busy || hide ? 'disabled' : ''}>↺ Start value</button>
+    <button class="btn" data-act="srandom" ${busy || hide ? 'disabled' : ''}>Random</button>
+    <button class="btn" data-act="sneg" ${busy || hide ? 'disabled' : ''}>Negative example</button>
+  </div>
+  <p class="note rev-only">Click any bit to set your own starting value.</p>`;
+  return h;
+}
+function shiftHow() {
+  return `<h2>Binary shifts</h2>
+  <p>A <b>shift</b> moves every bit in the register one place left or right. One bit falls off the end and is lost, and a new bit fills the gap at the other end.</p>
+  <table class="tbl"><tr><th>Shift</th><th>Gap filled with</th><th>Effect</th></tr>
+    <tr><td>Logical left</td><td>0</td><td>× 2</td></tr>
+    <tr><td>Logical right</td><td>0</td><td>÷ 2 (rounded down)</td></tr>
+    <tr><td>Arithmetic left</td><td>0 (same as logical)</td><td>× 2</td></tr>
+    <tr><td>Arithmetic right</td><td><b>copy of the sign bit</b></td><td>÷ 2, sign kept</td></tr></table>
+  <p>Shifting <i>n</i> places multiplies or divides by 2<sup><i>n</i></sup>: two places left is × 4, three places right is ÷ 8.</p>
+  <h3>Logical or arithmetic?</h3>
+  <p><b>Logical</b> shifts treat the bits as an unsigned number. <b>Arithmetic</b> shifts are for two’s complement (signed) numbers: shifting right copies the sign bit, so a negative number stays negative.</p>
+  <h3>When it goes wrong</h3>
+  <ul><li><b>Left:</b> if a 1 falls off (or the sign bit changes in an arithmetic shift), the answer is too big for the register – <b>overflow</b>.</li>
+  <li><b>Right:</b> if a 1 falls off, the remainder is lost, so the answer is rounded down – a <b>loss of precision</b>.</li></ul>
+  <div class="tip"><span class="tip-title">Try this</span>Press <b>Negative example</b>, then compare a logical and an arithmetic shift right of the same number.</div>
+  <div class="tip exam"><span class="tip-title">Exam tip</span>Always write the answer as 8 bits. For an arithmetic shift right, check the leftmost bits are copies of the original sign bit.</div>`;
+}
+
+/* ==================== CHALLENGE ==================== */
+function newQuestion() {
+  const t = settings.tool, signed = settings.signed;
+  let q;
+  if (t === 'convert') {
+    const kinds = ['b2d', 'd2b', 'b2d', 'd2b', 'states'].concat(signed ? ['sb2d', 'sd2b', 'sb2d', 'sd2b'] : []);
+    const k = pick(kinds);
+    conv.w = 8; conv.flash = [];
+    if (k === 'b2d') { const v = rnd(1, 255); conv.v = v; q = { tool: t, signed: false, kind: 'den', hideReadout: true, text: 'What is this unsigned binary number in denary?', ans: String(v), why: `${convTermsFor(v, false).join(' + ')} = ${v}` }; }
+    else if (k === 'd2b') { const v = rnd(1, 255); conv.v = 0; q = { tool: t, signed: false, kind: 'bin', hideReadout: true, text: `Write <b>${v}</b> as an 8-bit binary number.`, ans: bstr(v), why: `${convTermsFor(v, false).join(' + ')} = ${v}`, show: v } }
+    else if (k === 'sb2d') { const v = rnd(0, 1) ? rnd(128, 255) : rnd(1, 127); conv.v = v; q = { tool: t, signed: true, kind: 'den', hideReadout: true, text: 'This register holds a <b>two’s complement</b> number. What is it in denary?', ans: String(toSigned(v, 8)), why: `${convTermsFor(v, true).join(' + ').replace(/\+ −/g, MINUS + ' ')} = ${fmt(toSigned(v, 8))}` }; }
+    else if (k === 'sd2b') { const n = -rnd(1, 128); conv.v = 0; q = { tool: t, signed: true, kind: 'bin', strict: true, hideReadout: true, text: `Write <b>${fmt(n)}</b> as an 8-bit <b>two’s complement</b> binary number.`, ans: bstr((n + 256) & 255), why: `${-n} = ${bsp(-n & 255)} → flip = ${bsp((~(-n)) & 255)} → add 1 = ${bsp((n + 256) & 255)}`, show: (n + 256) & 255 }; }
+    else { const n = rnd(2, 10); q = { tool: t, signed: settings.signed, kind: 'den', text: `How many different patterns can be made with <b>${n} bits</b>?`, ans: String(1 << n), why: `2<sup>${n}</sup> = ${1 << n}. Each extra bit doubles the number of patterns.` }; }
+  } else if (t === 'add') {
+    const over = Math.random() < 0.4;
+    let a, b; do { a = rnd(20, 230); b = rnd(10, 200); } while (over ? a + b <= 255 : a + b > 255);
+    add.a = a; add.b = b; addReset();
+    if (Math.random() < 0.3) q = { tool: t, kind: 'mc', text: 'Will adding A and B cause an <b>overflow</b> in an 8-bit register?', opts: ['Yes', 'No'], ans: a + b > 255 ? 'Yes' : 'No', why: `${a} + ${b} = ${a + b}, which ${a + b > 255 ? 'is more than 255, so it needs 9 bits' : 'fits in 8 bits (0–255)'}.` };
+    else q = { tool: t, kind: 'bin', strict: true, text: 'Add A and B. What does the 8-bit register hold afterwards?', ans: bstr((a + b) & 255), why: `${a} + ${b} = ${a + b}${a + b > 255 ? ` – overflow! Only the last 8 bits are kept (${(a + b) & 255})` : ''}.` };
+  } else {
+    const type = pick(['logical', 'arith']), dir = pick(['L', 'R']), places = rnd(1, 3);
+    let v = rnd(1, 255); if (type === 'arith' && dir === 'R' && Math.random() < 0.6) v = rnd(128, 255);
+    shiftResetTo(v); sh.type = type;
+    let r = v; for (let i = 0; i < places; i++) r = shiftCalc(r, dir, type).nv;
+    const name = `${type === 'arith' ? 'an arithmetic' : 'a logical'} shift ${dir === 'L' ? 'left' : 'right'} of <b>${places} place${places > 1 ? 's' : ''}</b>`;
+    if (Math.random() < 0.25 && type === 'logical') {
+      const eff = `${dir === 'L' ? 'Multiplies' : 'Divides'} it by ${1 << places}`;
+      q = { tool: t, kind: 'mc', text: `What effect does ${name} have on an unsigned number (ignoring overflow / remainders)?`, opts: shuffle([eff, `${dir === 'L' ? 'Divides' : 'Multiplies'} it by ${1 << places}`, `${dir === 'L' ? 'Multiplies' : 'Divides'} it by ${places * 2 === (1 << places) ? (1 << places) * 2 : places * 2}`, `Adds ${places} to it`]), ans: eff, why: `Each place ${dir === 'L' ? 'left doubles' : 'right halves'} the value, so ${places} place${places > 1 ? 's' : ''} = ${dir === 'L' ? '×' : '÷'} 2<sup>${places}</sup> = ${1 << places}.`, dir, places, type };
+    } else q = { tool: t, kind: 'bin', strict: true, text: `Apply ${name} to this register. What is the result?`, ans: bstr(r), why: dir === 'R' && type === 'arith' ? 'The sign bit is copied into each gap on the left.' : `A 0 fills each gap ${dir === 'L' ? 'on the right' : 'on the left'}.`, dir, places, type };
+  }
+  chal.q = q; chal.answered = false; chal.correct = null; chal.given = null;
+  dockMsg = null;
+  render();
+  const inp = $('#ansIn'); if (inp && !settings.presenter) inp.focus();
+}
+function convTermsFor(v, signed) { const t = []; for (let p = 7; p >= 0; p--) if ((v >> p) & 1) t.push(signed && p === 7 ? MINUS + '128' : String(1 << p)); return t.length ? t : ['0']; }
+function checkAnswer(given) {
+  const q = chal.q; if (!q || chal.answered) return;
+  let ok = false, norm = (given || '').trim();
+  if (q.kind === 'bin') {
+    norm = norm.replace(/\s+/g, '');
+    if (!/^[01]+$/.test(norm)) { flashDockError('Use only 0s and 1s.'); return; }
+    if (norm.length > 8) { flashDockError('That’s more than 8 bits.'); return; }
+    if (q.strict && norm.length !== 8) { flashDockError('Give all 8 bits, including leading 0s.'); return; }
+    ok = norm.padStart(8, '0') === q.ans;
+  } else if (q.kind === 'den') {
+    norm = norm.replace(MINUS, '-').replace(/^\+/, '');
+    if (!/^-?\d+$/.test(norm)) { flashDockError('Type a whole number.'); return; }
+    ok = String(parseInt(norm, 10)) === q.ans;
+  } else ok = norm === q.ans;
+  chal.given = given; reveal(ok);
+}
+function flashDockError(t) { const e = $('#dockErr'); if (e) e.textContent = t; }
+function reveal(ok) {
+  const q = chal.q; if (!q || chal.answered) return;
+  chal.answered = true; chal.correct = ok === undefined ? null : ok;
+  chal.total++; if (ok) chal.right++;
+  // show the working on the stage
+  if (q.tool === 'convert' && q.show != null) { conv.v = q.show; conv.flash = [...Array(8).keys()]; }
+  if (q.tool === 'add') { render(); addAll(true); return; }
+  if (q.tool === 'shift') {
+    render();
+    let n = 0; const again = () => { if (++n < q.places) setTimeout(() => doShift(q.dir, again), 250); };
+    doShift(q.dir, again); return;
+  }
+  render();
+}
+function renderChallengeDock() {
+  const q = chal.q, sc = `<span class="score">Score ${chal.right} / ${chal.total}</span>`;
+  if (!q) return `<div class="dock-row"><span class="badge ch">Challenge</span>Getting a question…</div>`;
+  let h = `<div class="dock-row"><span class="badge ch">Challenge</span><span>${q.text}</span>${sc}</div>`;
+  if (!chal.answered) {
+    if (q.kind === 'mc') h += `<div class="dock-row">${q.opts.map((o, i) => `<button class="opt" data-i="${i}">${o}</button>`).join('')}</div>`;
+    else h += `<div class="dock-row"><input id="ansIn" autocomplete="off" spellcheck="false" inputmode="${q.kind === 'den' ? 'numeric' : 'numeric'}" placeholder="${q.kind === 'bin' ? '8 bits, e.g. 0100 1010' : 'denary'}" aria-label="Your answer">
+      <button class="btn primary" id="ansCheck">Check</button>
+      ${q.kind === 'bin' && q.tool === 'convert' ? '<button class="btn" id="ansCopy" title="Use the bits you set in the register">Copy from register</button>' : ''}
+      <span id="dockErr" style="color:#ffb4a8"></span></div>`;
+    h += `<div class="dock-hint">${q.kind === 'mc' ? 'Choose an answer' : 'Type your answer and press Enter'}, or press <kbd>Space</kbd> to reveal it.</div>`;
+  } else {
+    if (q.kind === 'mc') h += `<div class="dock-row">${q.opts.map(o => `<button class="opt ${o === q.ans ? 'right' : o === chal.given ? 'wrong' : 'dim'}" disabled>${o}</button>`).join('')}</div>`;
+    const ans = q.kind === 'bin' ? `<code>${q.ans.slice(0, 4)} ${q.ans.slice(4)}</code>` : `<b>${q.kind === 'den' ? fmt(+q.ans) : q.ans}</b>`;
+    const mark = chal.correct === true ? '✓ Correct!' : chal.correct === false ? '✗ Not quite.' : 'Answer:';
+    h += `<div class="fb ${chal.correct ? 'ok' : 'bad'}"><span class="mark">${mark}</span>${chal.correct ? '' : `The answer is ${ans}. `}${q.why}</div>
+      <div class="dock-row"><button class="btn primary" id="ansNext">Next question ▶</button><span class="dock-hint">or press <kbd>Space</kbd></span></div>`;
+  }
+  return h;
+}
+function toggleChallenge() {
+  chal.on = !chal.on; chal.q = null; busy = false;
+  if (chal.on) { chal.right = 0; chal.total = 0; newQuestion(); }
+  else { dockMsg = null; render(); }
+}
+
+/* ==================== render ==================== */
+const stage = $('#stage'), dock = $('#dock');
+function render() {
+  document.querySelectorAll('.seg.tools button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === settings.tool));
+  $('#tgSigned').setAttribute('aria-pressed', settings.signed);
+  $('#tgHex').setAttribute('aria-pressed', settings.hex);
+  $('#tgChal').setAttribute('aria-pressed', chal.on);
+  $('#tgMode').setAttribute('aria-pressed', settings.presenter);
+  $('#tgMode').textContent = settings.presenter ? 'Revision mode' : 'Presenter mode';
+  document.documentElement.classList.toggle('presenter', settings.presenter);
+  const keepIn = $('#denIn') ? $('#denIn').value : '';
+  stage.innerHTML = settings.tool === 'convert' ? renderConvert() : settings.tool === 'add' ? renderAdd() : renderShift();
+  if ($('#denIn')) $('#denIn').value = keepIn;
+  conv.flash = [];
+  renderDock(); renderHow();
+}
+function renderDock() {
+  const prevAns = $('#ansIn') ? $('#ansIn').value : null;
+  if (chal.on) {
+    dock.innerHTML = renderChallengeDock();
+    const inp = $('#ansIn');
+    if (inp) {
+      if (prevAns) inp.value = prevAns;
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); checkAnswer(inp.value); } e.stopPropagation(); });
+      $('#ansCheck').addEventListener('click', () => checkAnswer(inp.value));
+      const cp = $('#ansCopy'); if (cp) cp.addEventListener('click', () => { inp.value = bsp(conv.v, 8); inp.focus(); });
+    }
+    dock.querySelectorAll('.opt[data-i]').forEach(b => b.addEventListener('click', () => { chal.given = chal.q.opts[+b.dataset.i]; const ok = chal.given === chal.q.ans; const g = chal.given; reveal(ok); chal.given = g; renderDock(); }));
+    const nx = $('#ansNext'); if (nx) nx.addEventListener('click', newQuestion);
+    return;
+  }
+  if (dockMsg) { dock.innerHTML = `<div class="dock-row"><span class="badge${dockMsg.warn ? ' warn' : ''}">${dockMsg.badge}</span><span>${dockMsg.text}</span></div>`; return; }
+  const intro = {
+    convert: 'Click the bits to switch them on and off, or type a denary number. Use <kbd>↑</kbd> <kbd>↓</kbd> to count up and down in binary.',
+    add: 'Click the bits of A and B to choose two numbers, then press <kbd>Space</kbd> to add one column at a time.',
+    shift: 'Choose logical or arithmetic, then press <kbd>←</kbd> or <kbd>→</kbd> to shift every bit one place.'
+  }[settings.tool];
+  dock.innerHTML = `<div class="dock-row"><span class="badge">${{ convert: 'Convert', add: 'Add', shift: 'Shift' }[settings.tool]}</span><span>${intro}</span></div>`;
+}
+function renderHow() {
+  $('#p-how').innerHTML = settings.tool === 'convert' ? convHow() : settings.tool === 'add' ? addHow() : shiftHow();
+}
+
+/* ---------- stage events (delegated) ---------- */
+stage.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  if (b.dataset.signed != null) { settings.signed = b.dataset.signed === '1'; save(); dockMsg = null; render(); return; }
+  if (b.dataset.type) { sh.type = b.dataset.type; dockMsg = { badge: 'Shift', text: sh.type === 'arith' ? 'Arithmetic shifts are for two’s complement numbers: shifting right copies the sign bit into the gap.' : 'Logical shifts treat the bits as an unsigned number: the gap is always filled with 0.' }; render(); return; }
+  if (b.classList.contains('bit') && b.dataset.p != null) {
+    const p = +b.dataset.p;
+    if (settings.tool === 'convert') { convBitClick(p); render(); }
+    else if (settings.tool === 'add') { add[b.dataset.row] ^= (1 << p); addReset(); dockMsg = { badge: 'Add', text: `A = ${add.a}, B = ${add.b}. Press <kbd>Space</kbd> to add the first column.` }; render(); }
+    else { shiftResetTo(sh.v ^ (1 << p)); dockMsg = { badge: 'Shift', text: `New starting value: <code>${bsp(sh.v)}</code> = ${sh.v}${(sh.v >> 7) & 1 ? ` (or ${fmt(toSigned(sh.v, 8))} as two’s complement)` : ''}.` }; render(); }
+    return;
+  }
+  const act = b.dataset.act; if (!act) return;
+  const A = {
+    wdown: () => { conv.w--; conv.v &= mask(conv.w); dockMsg = null; render(); },
+    wup: () => { conv.w++; dockMsg = null; render(); },
+    inc: () => { convStep(1); render(); }, dec: () => { convStep(-1); render(); },
+    set: () => { convSet(); render(); }, negate: convNegate,
+    clear: () => { conv.v = 0; dockMsg = null; render(); },
+    random: () => { conv.v = rnd(0, mask(conv.w)); conv.flash = [...Array(conv.w).keys()]; dockMsg = null; render(); },
+    astep: () => { if (!busy) { addStep(); render(); } }, aall: () => addAll(true),
+    areset: () => { addReset(); dockMsg = null; render(); },
+    arandom: () => { add.a = rnd(1, 200); add.b = rnd(1, 120); addReset(); dockMsg = null; render(); },
+    aover: () => { add.a = rnd(150, 230); add.b = rnd(256 - add.a + 5, 220); addReset(); dockMsg = { badge: 'Overflow example', text: `${add.a} + ${add.b} = ${add.a + add.b}. Will it fit in 8 bits? Press <kbd>Space</kbd> to find out.` }; render(); },
+    sl: () => doShift('L'), sr: () => doShift('R'), sundo: shiftUndo,
+    sreset: () => { shiftResetTo(sh.start); dockMsg = null; render(); },
+    srandom: () => { shiftResetTo(rnd(1, 255)); dockMsg = null; render(); },
+    sneg: () => { shiftResetTo(pick([0b11101000, 0b11011000, 0b10110000, 0b11110100, 0b11010110])); dockMsg = { badge: 'Negative example', text: `<code>${bsp(sh.v)}</code> is ${fmt(toSigned(sh.v, 8))} in two’s complement. Try a logical shift right, undo it, then try an arithmetic shift right.` }; render(); }
+  };
+  if (A[act]) A[act]();
+});
+stage.addEventListener('keydown', e => { if (e.target.id === 'denIn' && e.key === 'Enter') { e.preventDefault(); convSet(); render(); } });
+
+/* ---------- tools & toggles ---------- */
+function setTool(t) {
+  if (busy) return;
+  settings.tool = t; save(); dockMsg = null;
+  if (chal.on) { newQuestion(); return; }
+  render();
+}
+document.querySelectorAll('.seg.tools button').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
+function toggleSigned() { settings.signed = !settings.signed; save(); dockMsg = null; if (chal.on && settings.tool === 'convert') newQuestion(); else render(); }
+function toggleHex() { settings.hex = !settings.hex; save(); render(); }
+function togglePresenter() { settings.presenter = !settings.presenter; save(); render(); }
+function fullscreen() { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) {} }
+if (!document.fullscreenEnabled) $('#btnFull').hidden = true;
+$('#tgSigned').addEventListener('click', toggleSigned);
+$('#tgHex').addEventListener('click', toggleHex);
+$('#tgChal').addEventListener('click', toggleChallenge);
+$('#tgMode').addEventListener('click', togglePresenter);
+$('#btnFull').addEventListener('click', fullscreen);
+$('#btnHelp').addEventListener('click', () => $('#helpDlg').showModal());
+
+function resetTool() {
+  if (busy || chal.on) return;
+  if (settings.tool === 'convert') conv.v = 0;
+  else if (settings.tool === 'add') addReset();
+  else shiftResetTo(sh.start);
+  dockMsg = null; render();
+}
+function spaceKey() {
+  if (chal.on) { if (!chal.q) return; if (chal.answered) { if (!busy) newQuestion(); } else reveal(undefined); return; }
+  if (settings.tool === 'add' && !busy) { addStep(); render(); }
+}
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (document.querySelector('dialog[open]')) return;
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
+  if (e.target.getAttribute && e.target.getAttribute('role') === 'tab' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return;
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key, T = settings.tool, free = !chal.on && !busy;
+  const map = {
+    ' ': spaceKey, '1': () => setTool('convert'), '2': () => setTool('add'), '3': () => setTool('shift'),
+    s: toggleSigned, h: toggleHex, q: toggleChallenge, p: togglePresenter, f: fullscreen, r: resetTool, '?': () => $('#helpDlg').showModal(),
+    ArrowUp: () => { if (T === 'convert' && free) { convStep(1); render(); } },
+    ArrowDown: () => { if (T === 'convert' && free) { convStep(-1); render(); } },
+    ArrowLeft: () => { if (T === 'shift' && free) doShift('L'); },
+    ArrowRight: () => { if (T === 'shift' && free) doShift('R'); },
+    n: () => { if (T === 'add' && free) addAll(true); },
+    z: () => { if (T === 'shift' && free) shiftUndo(); }
+  };
+  const fn = map[k]; if (fn) { e.preventDefault(); fn(); }
+});
+
+/* ---------- side panel: tabs, key ideas, quiz ---------- */
+const TABS = ['how', 'ideas', 'quiz'];
+function showTab(t) { TABS.forEach(x => { $('#t-' + x).setAttribute('aria-selected', x === t); $('#p-' + x).hidden = x !== t; }); }
+TABS.forEach((t, i) => {
+  const b = $('#t-' + t);
+  b.addEventListener('click', () => showTab(t));
+  b.addEventListener('keydown', e => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); const n = TABS[(i + (e.key === 'ArrowRight' ? 1 : 2)) % 3]; showTab(n); $('#t-' + n).focus(); } });
+});
+$('#p-ideas').innerHTML = `
+  <h3 style="margin-top:0">Why binary?</h3>
+  <p>Computers are built from billions of tiny switches that are either on or off, so everything – numbers, text, sound, images and program instructions – is stored as <b>binary</b> (1s and 0s).</p>
+  <h3>Number of patterns</h3>
+  <p><i>n</i> bits can make <b>2<sup><i>n</i></sup></b> different patterns. 1 bit → 2, 4 bits → 16, 8 bits → 256.</p>
+  <h3>Unsigned integers</h3>
+  <p>All 8 bits are used for the size of the number. Range: <b>0 to 255</b>.</p>
+  <h3>Two’s complement (signed) integers</h3>
+  <p>The leftmost bit is worth <b>−128</b>. If it is 1, the number is negative. Range: <b>−128 to +127</b>.</p>
+  <p>To make a number negative: write it in binary, <b>flip every bit</b>, then <b>add 1</b>.</p>
+  <table class="tbl"><tr><th>Binary</th><th>Unsigned</th><th>Two’s complement</th></tr>
+    <tr><td class="m">0000 0001</td><td>1</td><td>+1</td></tr>
+    <tr><td class="m">0111 1111</td><td>127</td><td>+127</td></tr>
+    <tr><td class="m">1000 0000</td><td>128</td><td>−128</td></tr>
+    <tr><td class="m">1111 1111</td><td>255</td><td>−1</td></tr></table>
+  <h3>Binary addition</h3>
+  <p>0 + 0 = 0, 0 + 1 = 1, 1 + 1 = 10 (write 0, carry 1), 1 + 1 + 1 = 11 (write 1, carry 1).</p>
+  <h3>Overflow</h3>
+  <p>Overflow happens when the result of a calculation needs <b>more bits than are available</b>. The extra bit is lost and the stored answer is wrong. For example, 200 + 100 = 300, which does not fit in 8 bits.</p>
+  <h3>Binary shifts</h3>
+  <ul><li><b>Logical shift left</b>: × 2 for each place, 0s fill the gap.</li>
+    <li><b>Logical shift right</b>: ÷ 2 for each place, 0s fill the gap. Any 1s that fall off are lost (the answer is rounded down).</li>
+    <li><b>Arithmetic shift right</b>: the sign bit is copied into the gap, so negative numbers stay negative.</li>
+    <li><b>Arithmetic shift left</b>: the same as a logical shift left. If the sign bit changes, overflow has occurred.</li></ul>
+  <h3>Hexadecimal</h3>
+  <p>Each hex digit (0–9, A–F) stands for 4 bits, so an 8-bit byte is just 2 hex digits: <code>1010 0101</code> = <b>A5</b>. Hex is shorter and easier for humans to read and remember than long binary strings. Turn on <b>Hex</b> to see it.</p>
+  <div class="tip exam"><span class="tip-title">Exam tips</span><ul>
+    <li>Calculators aren’t allowed in Paper 1 – practise converting quickly by hand.</li>
+    <li>Always give 8-bit answers with all 8 bits, including leading 0s.</li>
+    <li>Show your working: carries for addition, place values for conversions.</li>
+    <li>Use the word <b>overflow</b> when a result is too big for the number of bits.</li></ul></div>`;
+
+const QUIZ = [
+  { q: 'How many different patterns can be made with 8 bits?', o: ['256', '255', '8', '128'], why: '2⁸ = 256 (from 0000 0000 to 1111 1111).' },
+  { q: 'What is 1010 0101 in denary (unsigned)?', o: ['165', '160', '101', '85'], why: '128 + 32 + 4 + 1 = 165.' },
+  { q: 'What is the largest number an 8-bit unsigned register can hold?', o: ['255', '256', '128', '127'], why: '1111 1111 = 128 + 64 + 32 + 16 + 8 + 4 + 2 + 1 = 255.' },
+  { q: 'What is the range of an 8-bit two’s complement number?', o: ['−128 to +127', '−127 to +127', '0 to 255', '−255 to +255'], why: 'The leftmost bit is worth −128, so the smallest is 1000 0000 = −128 and the largest is 0111 1111 = +127.' },
+  { q: 'What is −1 as an 8-bit two’s complement number?', o: ['1111 1111', '1000 0001', '0000 0001', '1111 1110'], why: '1 = 0000 0001 → flip = 1111 1110 → add 1 = 1111 1111.' },
+  { q: 'What is the effect of a logical shift left of 2 places on an unsigned number (if no overflow)?', o: ['It multiplies it by 4', 'It multiplies it by 2', 'It divides it by 4', 'It adds 2'], why: 'Each place left doubles the value: 2 × 2 = 4.' },
+  { q: 'How is an arithmetic shift right different from a logical shift right?', o: ['The sign bit is copied into the gap instead of a 0', 'It moves the bits two places', 'A 1 always fills the gap', 'There is no difference'], why: 'Copying the sign bit keeps negative two’s complement numbers negative.' },
+  { q: 'An 8-bit register holds 1111 1111. 1 is added to it. What does it hold now?', o: ['0000 0000 – overflow has occurred', '1 0000 0000', '1111 1111', '0000 0001'], why: '255 + 1 = 256 needs 9 bits. The 9th bit is lost, leaving 0000 0000.' },
+  { q: 'What is overflow?', o: ['When a result needs more bits than are available to store it', 'When a number is negative', 'When a shift moves bits to the right', 'When a register is full of 1s'], why: 'The extra bit cannot be stored, so the answer is wrong.' },
+  { q: 'Why is hexadecimal often used instead of binary?', o: ['It is shorter and easier for people to read and remember', 'Computers process hex faster', 'It uses less memory', 'It can store negative numbers'], why: 'Computers still use binary – hex is just a shorter way for humans to write it (1 hex digit = 4 bits).' }
+];
+const quizState = QUIZ.map(q => ({ order: shuffle(q.o.map((_, i) => i)), chosen: null }));
+function renderQuiz() {
+  const right = quizState.filter(x => x.chosen === 0).length;
+  let h = `<p>Answer each question – you’ll see straight away if you’re right. Score: <b>${right} / ${QUIZ.length}</b></p>`;
+  QUIZ.forEach((q, qi) => {
+    const st = quizState[qi];
+    h += `<div class="q"><p>${qi + 1}. ${q.q}</p><div class="qopts">`;
+    st.order.forEach(oi => { let c = ''; if (st.chosen != null) c = oi === 0 ? 'right' : oi === st.chosen ? 'wrong' : ''; h += `<button class="qopt ${c}" data-q="${qi}" data-o="${oi}" ${st.chosen != null ? 'disabled' : ''}>${q.o[oi]}</button>`; });
+    h += '</div>' + (st.chosen != null ? `<div class="qwhy">${st.chosen === 0 ? '✓ Correct. ' : '✗ Not quite. '}${q.why}</div>` : '') + '</div>';
+  });
+  h += `<button class="btn" id="quizReset">Try again</button>`;
+  const el = $('#p-quiz'); el.innerHTML = h;
+  el.querySelectorAll('.qopt').forEach(b => b.addEventListener('click', () => { quizState[+b.dataset.q].chosen = +b.dataset.o; renderQuiz(); }));
+  $('#quizReset').addEventListener('click', () => { quizState.forEach(x => { x.chosen = null; shuffle(x.order); }); renderQuiz(); });
+}
+
+renderQuiz(); render();
+})();
+</script>
+</body>
+</html>
