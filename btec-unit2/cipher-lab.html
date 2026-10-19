@@ -131,10 +131,10 @@ table.g td.rowh{font-family:var(--sans);font-size:.75rem;font-weight:800;color:v
 .rotor .nm{font-size:.75rem;color:var(--muted);font-weight:800}
 .rotor .ud{display:flex;gap:.15rem;justify-content:center;margin-top:.2rem}
 .rotor .ud button{min-height:1.6rem;padding:0 .4rem}
-.rotorrow{display:flex;flex-wrap:wrap;gap:.6rem 2rem;margin-top:.5rem;align-items:flex-start}
-.rotor .setw{width:2.6rem;height:2.6rem;border:2px dashed var(--muted);border-radius:.4rem;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:1.3rem;font-weight:800;margin:0 auto;background:#fff}
 .rotor .win.turned{background:var(--hi);box-shadow:0 0 0 3px var(--cur-edge)}
-.rotor .notch{font-size:.68rem;font-weight:700;color:var(--muted);margin-top:.2rem;min-height:1.6rem}
+.rotorrow{display:flex;flex-wrap:wrap;gap:.6rem 1.5rem;margin-top:.5rem;align-items:center}
+.rotorrow .how{font-size:.85rem;color:var(--muted);max-width:30rem}
+.rotor .setw{width:2.6rem;height:2.6rem;border:2px dashed var(--muted);border-radius:.4rem;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:1.3rem;font-weight:800;margin:0 auto;background:#fff}
 .path{display:flex;flex-wrap:wrap;gap:.25rem;align-items:center;font-family:var(--mono);margin-top:.6rem}
 .path .p{border:2px solid var(--ink);border-radius:.35rem;padding:.1rem .45rem;font-weight:800;background:#fff;text-align:center}
 .path .p small{display:block;font-family:var(--sans);font-size:.62rem;font-weight:700}
@@ -373,7 +373,7 @@ const settings = Object.assign({
   trans: { variant: 'rail', msg: 'WE ARE DISCOVERED FLEE AT ONCE', rails: 3, keyword: 'ZEBRA' },
   xor: { msg: 'HI BOB', key: 'KEY' },
   otp: { msg: 'ATTACK AT DAWN', key: '' },
-  rotor: { msg: 'HELLO HELLO', start: 'ADU' },
+  rotor: { msg: 'MEET ME AT THE OLD BRIDGE', start: 'A' },
   steg: { msg: 'MEET AT NOON' }
 }, store.get('cipherSim.v1', {}));
 const save = () => store.set('cipherSim.v1', settings);
@@ -396,12 +396,12 @@ const ALGO = {
   'xor-enc': ['Input message', 'Input key', 'Convert the first character of the message to binary (ASCII)', 'Convert the matching character of the key to binary; if the key is shorter, start again from its first character', 'Compare the bits in each position: write 1 if they are different, 0 if they are the same', 'Record the result', 'Move on to the next character', 'If there are no more characters, stop', 'Otherwise go back to instruction 3'],
   'otp-enc': ['Input message', 'Generate a truly random key that is at least as long as the message', 'Take the first letter of the message and the first letter of the key', 'Convert both letters to numbers (A = 0 … Z = 25)', 'Add the two numbers together', 'If the total is 26 or more, subtract 26', 'Convert the result back to a letter and record it', 'Move on to the next letter of the message and the key', 'If there are no more letters, stop', 'Otherwise go back to instruction 4', 'Destroy the key so it can never be used again'],
   'otp-dec': ['Input ciphertext', 'Input the same key that was used to encrypt', 'Take the first letter of the ciphertext and the first letter of the key', 'Convert both letters to numbers (A = 0 … Z = 25)', 'Subtract the key number from the ciphertext number', 'If the result is below 0, add 26', 'Convert the result back to a letter and record it', 'Move on to the next letter of the ciphertext and the key', 'If there are no more letters, stop', 'Otherwise go back to instruction 4', 'Destroy the key so it can never be used again'],
-  'rotor-enc': ['Input message', 'Set the starting position of each rotor', 'Take the first letter', 'Turn the right-hand rotor on one place; if a rotor reaches its notch, turn the rotor to its left too', 'Pass the letter through each rotor from right to left, swapping it for the letter it is wired to', 'Bounce the letter off the reflector', 'Pass the letter back through the rotors from left to right', 'Record the output letter', 'Move on to the next letter', 'If there are no more letters, stop', 'Otherwise go back to instruction 4'],
+  'rotor-enc': ['Input message', 'Set the starting position of the rotor', 'Take the first letter', 'Find the letter on the input ring', 'Follow the rotor’s wiring to find the output letter', 'Record the output letter', 'Turn the rotor on one place', 'Move on to the next letter', 'If there are no more letters, stop', 'Otherwise go back to instruction 4'],
   'steg-enc': ['Input the image and the secret message', 'Convert the message to binary, 8 bits per character, and add an end marker (00000000)', 'Take the first colour value of the first pixel', 'Replace its least significant (right-most) bit with the next bit of the message', 'Move on to the next colour value', 'If there are more message bits, go back to instruction 4', 'Save the image'],
   'steg-dec': ['Input the image', 'Take the first colour value of the first pixel', 'Record its least significant (right-most) bit', 'When you have 8 bits, convert them to a character', 'If the character is the end marker (00000000), stop', 'Otherwise move on to the next colour value and go back to instruction 3']
 };
 ALGO['xor-dec'] = ALGO['xor-enc'].map((s, i) => i === 0 ? 'Input ciphertext (as binary)' : i === 2 ? 'Take the first 8 bits of the ciphertext' : s);
-ALGO['rotor-dec'] = ALGO['rotor-enc'].map((s, i) => i === 0 ? 'Input ciphertext' : i === 1 ? 'Set the rotors to the same starting positions used to encrypt' : s);
+ALGO['rotor-dec'] = ['Input ciphertext', 'Set the rotor to the same starting position used to encrypt', 'Take the first letter', 'Find the letter on the output side of the rotor', 'Follow the wiring backwards to find the input letter', 'Record the plaintext letter', 'Turn the rotor on one place', 'Move on to the next letter', 'If there are no more letters, stop', 'Otherwise go back to instruction 4'];
 
 function traceSub(s, dec) {
   const v = s.variant, msg = s.msg.toUpperCase(), steps = [], shift = ((+s.shift % 26) + 26) % 26;
@@ -656,53 +656,57 @@ function reuseDemo(s) {
     <p>…and then decrypt the second message: <code>${c2}</code> − key = <b><code>${m2r}</code></b>. That is why the key must only ever be used <b>once</b>.</p></details>`;
 }
 
-/* ---------- 5. rotor (Enigma-style) ---------- */
-const ROT = [['EKMFLGDQVZNTOWYHXUSPAIBRCJ', 'Q', 'I'], ['AJDKSIRUXBLHWTMCQGZNPYFVOE', 'E', 'II'], ['BDFHJLCPRTXVZNYEIWGAKMUSQO', 'V', 'III']];
-const REFL = 'YRUHQSLDPXNGOKMIEBFZCWVJAT';
+/* ---------- 5. rotor (single wheel) ---------- */
+const WHEEL = 'EKMFLGDQVZNTOWYHXUSPAIBRCJ'; /* wired like rotor I of the Enigma machine */
+const rotStart = s => A.indexOf((lettersOnly(s.start) + 'A')[0]);
+const rotEnc = (m, p) => (A.indexOf(WHEEL[(m + p) % 26]) - p + 26) % 26;
+const rotDec = (c, p) => (WHEEL.indexOf(A[(c + p) % 26]) - p + 26) % 26;
+const wiringAt = p => A.split('').map((_, m) => A[rotEnc(m, p)]).join('');
+function rotorRun(msg, start, dec) { let p = start, out = ''; for (const ch of msg) { const k = A.indexOf(ch); out += A[dec ? rotDec(k, p) : rotEnc(k, p)]; p = (p + 1) % 26; } return out; }
 function traceRotor(s, dec) {
-  const msg = lettersOnly(s.msg), start = (lettersOnly(s.start) + 'AAA').slice(0, 3), p = [...start].map(c => A.indexOf(c)), steps = [];
-  let out = '';
-  const push = (line, note, x) => steps.push(Object.assign({ line: [].concat(line), note, msg, out, pos: p.map(x => A[x]).join(''), start }, x));
+  const msg = lettersOnly(s.msg), start = rotStart(s), steps = [];
+  let p = start, out = '';
+  const push = (line, note, x) => steps.push(Object.assign({ line: [].concat(line), note, msg, out, pos: p, start, from: -1, to: -1 }, x));
   push(1, `Input the ${dec ? 'ciphertext' : 'message'}: <code>${msg}</code>.`, { i: -1 });
-  push(2, `Set the rotors to <b>${start}</b>.`, { i: -1 });
+  push(2, `Set the rotor so its window shows <b>${A[start]}</b>. ${dec ? 'It must be the same start position that was used to encrypt.' : 'The start position is the key.'}`, { i: -1 });
   for (let i = 0; i < msg.length; i++) {
+    const k = A.indexOf(msg[i]), o = dec ? rotDec(k, p) : rotEnc(k, p);
     if (i === 0) push(3, `First letter: <b>${msg[0]}</b>.`, { i });
-    const mid = p[1] === A.indexOf(ROT[1][1]), right = p[2] === A.indexOf(ROT[2][1]);
-    let turned = 'the right-hand rotor (III) turns one place', moved = [2];
-    if (mid) { p[0] = (p[0] + 1) % 26; p[1] = (p[1] + 1) % 26; turned = `the right-hand rotor turns, and the middle rotor is sitting at its notch (${ROT[1][1]}), so it turns <b>and</b> pushes the left rotor round too – the famous “double step”`; moved = [0, 1, 2]; }
-    else if (right) { p[1] = (p[1] + 1) % 26; turned = `the right-hand rotor turns, and because it was at its notch (${ROT[2][1]}) it pushes the middle rotor round one place too`; moved = [1, 2]; }
-    p[2] = (p[2] + 1) % 26;
-    push(4, `Before the letter is encrypted, ${turned}. The windows now show <b>${p.map(x => A[x]).join('')}</b>.`, { i, moved });
-    const path = [msg[i]]; let c = A.indexOf(msg[i]);
-    for (let r = 2; r >= 0; r--) { c = (A.indexOf(ROT[r][0][(c + p[r]) % 26]) - p[r] + 26) % 26; path.push(A[c]); }
-    push(5, `Through the rotors right to left: ${path.join(' → ')}.`, { i, path: path.slice(), stage: 1 });
-    c = A.indexOf(REFL[c]); path.push(A[c]);
-    push(6, `The reflector swaps ${path[3]} for ${A[c]}.`, { i, path: path.slice(), stage: 2 });
-    for (let r = 0; r <= 2; r++) { c = (ROT[r][0].indexOf(A[(c + p[r]) % 26]) - p[r] + 26) % 26; path.push(A[c]); }
-    push(7, `Back through the rotors left to right: ${path.slice(4).join(' → ')}.`, { i, path: path.slice(), stage: 3 });
-    out += A[c];
-    push(8, `Record <b>${A[c]}</b>.`, { i, path: path.slice(), stage: 3 });
-    if (i < msg.length - 1) push([9, 11], `Move on to the next letter, <b>${msg[i + 1]}</b>, and go back to instruction 4.`, { i: i + 1, path: path.slice(), stage: 3 });
-    else push(9, 'That was the last letter.', { i, path: path.slice(), stage: 3 });
+    push(4, dec ? `Find <b>${msg[i]}</b> on the output side of the rotor.` : `Find <b>${msg[i]}</b> on the input ring.`, { i, from: dec ? o : k, to: -1, hlOut: dec });
+    push(5, dec ? `Follow the wiring backwards: <b>${msg[i]}</b> came from <b>${A[o]}</b>.` : `Follow the wiring: <b>${msg[i]}</b> → <b>${A[o]}</b>.`, { i, from: dec ? o : k, to: dec ? o : k, both: true });
+    out += A[o];
+    push(6, `Record <b>${A[o]}</b>.`, { i, from: dec ? o : k, to: dec ? o : k, both: true });
+    p = (p + 1) % 26;
+    push(7, `The rotor turns one place: its window now shows <b>${A[p]}</b>, so every letter is now wired to something different.`, { i, turned: true });
+    if (i < msg.length - 1) push([8, 10], `Move on to the next letter, <b>${msg[i + 1]}</b>, and go back to instruction 4.`, { i: i + 1 });
+    else push(8, 'That was the last letter.', { i });
   }
-  push(10, `No more letters. ${dec ? 'Plaintext' : 'Ciphertext'}: <b>${out}</b>. Notice repeated letters do not always give the same output.`, { i: -1, done: true });
+  push(9, `No more letters. ${dec ? 'Plaintext' : 'Ciphertext'}: <b>${out}</b>. Notice the repeated letters in the message did not always give the same output.`, { i: -1, done: true });
   return steps;
 }
 function renderRotor(st, s, dec) {
-  const pos = st.pos, start = st.start, moved = st.moved || [];
+  const map = wiringAt(st.pos);
+  const inCell = k => `<div class="c${st.from === k && !st.hlOut ? ' src' : ''}${st.both && st.from === k && dec ? ' hi' : ''}">${A[k]}</div>`;
+  const outCell = k => `<div class="c${st.from === k && st.hlOut ? ' src' : ''}${st.both && st.to === k && !dec ? ' hi' : ''}${st.both && st.from === k && dec ? ' src' : ''}">${map[k]}</div>`;
   let h = `<div class="lbl">${dec ? 'Ciphertext' : 'Message'}</div>${strip(st.msg, st.i, st.done)}
     <div class="rotorrow">
-      <div><div class="lbl">Start position (the key)</div>
-        <div class="rotors">${[0, 1, 2].map(r => `<div class="rotor"><div class="nm">Rotor ${ROT[r][2]}</div><div class="setw">${start[r]}</div><div class="ud"><button class="btn small" data-rot="${r}" data-d="-1" aria-label="Rotor ${ROT[r][2]} start back">−</button><button class="btn small" data-rot="${r}" data-d="1" aria-label="Rotor ${ROT[r][2]} start forward">+</button></div></div>`).join('')}</div></div>
-      <div><div class="lbl">Rotor windows now</div>
-        <div class="rotors">${[0, 1, 2].map(r => `<div class="rotor"><div class="nm">Rotor ${ROT[r][2]}</div><div class="win${moved.includes(r) ? ' turned' : ''}">${pos[r]}</div><div class="notch">${moved.includes(r) ? '↻ turned' : `notch ${ROT[r][1]}`}</div></div>`).join('')}
-        <div class="rotor"><div class="nm">Reflector</div><div class="win" style="background:#eef0f4">B</div><div class="notch">fixed</div></div></div></div>
-    </div>`;
-  if (st.path) {
-    const L = ['Key', 'Rotor III', 'Rotor II', 'Rotor I', 'Reflector', 'Rotor I', 'Rotor II', 'Rotor III'];
-    h += `<div class="path">${st.path.map((c, k) => `${k ? '<span class="ar">→</span>' : ''}<span class="p${k === 7 ? ' end' : ''}">${c}<small>${L[k]}</small></span>`).join('')}</div>`;
+      <div class="rotor"><div class="nm">Start position</div><div class="setw">${A[st.start]}</div><div class="ud"><button class="btn small" data-rot="0" data-d="-1" aria-label="Start position back">−</button><button class="btn small" data-rot="0" data-d="1" aria-label="Start position forward">+</button></div></div>
+      <div class="rotor"><div class="nm">Rotor window now</div><div class="win${st.turned ? ' turned' : ''}">${A[st.pos]}</div><div class="nm">${st.turned ? '↻ turned' : '&nbsp;'}</div></div>
+      <div class="how">The wheel’s wiring swaps every letter for another. After each letter the wheel turns one place, so the swaps change.</div>
+    </div>
+    <div class="lbl" style="margin-top:.7rem">The rotor’s wiring at position ${A[st.pos]}</div>
+    <div class="alpha"><div class="h">Input</div>${A.split('').map((_, k) => inCell(k)).join('')}<div class="h">Output</div>${A.split('').map((_, k) => outCell(k)).join('')}</div>
+    <div class="lbl" style="margin-top:.7rem">${dec ? 'Plaintext' : 'Ciphertext'}</div><div class="out">${esc(st.out)}</div>`;
+  // brute force: only 26 starting positions
+  const ct = dec ? st.msg : rotorRun(st.msg, st.start, false);
+  if (ct) {
+    const tries = A.split('').map((_, k) => { const d = rotorRun(ct, k, true); return { k, d, x: chi(d) }; });
+    const best = tries.reduce((a, b) => a.x < b.x ? a : b);
+    h += `<details class="card rev-only" style="margin-top:.7rem" id="crack" ${settings.crackOpen ? 'open' : ''}><summary><b>Crack it: try every start position</b></summary>
+      <p style="margin:.3rem 0">If an attacker knows how the wheel is wired, there are only <b>26</b> possible start positions. A computer tries them all instantly; the most English-looking result is highlighted. (On very short messages the computer’s best guess can be wrong, so a person checks the top few.)</p>
+      <div class="brute">${tries.map(t => `<div class="${t === best ? 'best' : ''}">start ${A[t.k]}: ${esc(t.d.slice(0, 40))}</div>`).join('')}</div>
+      <p style="margin:.4rem 0 0">The Enigma machine used three wheels chosen from five, a reflector and a plugboard, giving about 159 million million million settings – far too many to try by hand.</p></details>`;
   }
-  h += `<div class="lbl" style="margin-top:.7rem">${dec ? 'Plaintext' : 'Ciphertext'}</div><div class="out">${esc(st.out)}</div>`;
   return h;
 }
 
@@ -816,7 +820,7 @@ const INFO = {
   trans: { title: 'Transposition cipher', sub: 'The letters stay the same but are moved to different positions. Rail fence writes them in a zigzag; columnar writes them in a grid and reads the columns in keyword order.' },
   xor: { title: 'XOR cipher', sub: 'Each character is turned into binary and combined with the key using XOR. Doing exactly the same thing again with the same key gives the original back.' },
   otp: { title: 'One-time pad', sub: 'A truly random key, as long as the message, is added letter by letter. Used correctly it is unbreakable – but the key must never be reused.' },
-  rotor: { title: 'Rotor cipher (Enigma-style)', sub: 'Each letter passes through scrambling rotors that turn after every key press, so the substitution changes with every letter.' },
+  rotor: { title: 'Rotor cipher (single wheel)', sub: 'A wheel with scrambled wiring swaps each letter for another, then turns one place – so the substitution changes after every letter.' },
   steg: { title: 'Steganography', sub: 'Instead of scrambling the message, it is hidden inside something else – here, in the least significant bits of an image’s colour values.' }
 };
 function inputsHTML() {
@@ -832,7 +836,7 @@ function inputsHTML() {
   if (t === 'trans' && s.variant === 'col') h += `<label class="field">Keyword <input class="inp" data-k="keyword" value="${esc(s.keyword)}" style="width:9rem"></label>`;
   if (t === 'xor') h += `<label class="field">Key <input class="inp" data-k="key" value="${esc(s.key)}" style="width:8rem"></label>`;
   if (t === 'otp') h += `<label class="field">Key <input class="inp" data-k="key" value="${esc(s.key)}" style="width:14rem"></label><button class="btn small" data-act="newkey">New random key</button>`;
-  if (t === 'rotor') h += `<label class="field">Start <input class="inp" data-k="start" value="${esc(s.start)}" maxlength="3" style="width:4.5rem"></label>`;
+  if (t === 'rotor') h += `<label class="field">Start <input class="inp" data-k="start" value="${esc(A[rotStart(s)])}" maxlength="1" style="width:3.2rem"></label>`;
   if (dec() && t !== 'steg') h += `<button class="btn small" data-act="useout" title="Use the ciphertext you made when encrypting">Use my ciphertext</button>`;
   return h + '</div>';
 }
@@ -886,7 +890,7 @@ const EVAL = {
   trans: { good: ['Letter frequencies look exactly like English, which can mislead a codebreaker.', 'Easy to combine with a substitution cipher for extra strength.'], bad: ['The letters themselves are unchanged, so anagram-solving techniques can recover the message.', 'Few possible keys for a small number of rails.'], use: 'Historically combined with substitution (e.g. in the First World War). Modern ciphers such as AES still use permutation steps.' },
   xor: { good: ['Very fast for computers – a single operation on each bit.', 'The same operation encrypts and decrypts.', 'XOR is a building block of modern ciphers, including AES and stream ciphers.'], bad: ['A short repeating key creates patterns that can be found and broken.', 'If an attacker knows part of the plaintext, XOR with the ciphertext reveals that part of the key.'], use: 'As one step inside stronger algorithms, and in one-time pads when the key is truly random.' },
   otp: { good: ['<b>Perfectly secure</b> when the key is truly random, at least as long as the message, kept secret and used only once.'], bad: ['The key is as long as the message, so huge keys must be shared securely in advance.', 'Reusing the key even once lets an attacker recover the messages.', 'Truly random keys are hard to generate in large amounts.'], use: 'Very high-security links, such as diplomatic or military hotlines, where keys can be delivered in person.' },
-  rotor: { good: ['The substitution changes with every letter, defeating simple frequency analysis.', 'A huge number of settings (rotor choice, order, start positions, plugboard).'], bad: ['A letter can never encrypt to itself – a weakness used at Bletchley Park.', 'Repeated, predictable message content (“cribs”) let codebreakers test settings.', 'Security depends on keeping daily settings secret.'], use: 'The Second World War Enigma machine. Its breaking at Bletchley Park helped lead to modern computing.' },
+  rotor: { good: ['The substitution changes after every letter, so the same letter is encrypted differently each time.', 'Letter frequencies are flattened out, so simple frequency analysis does not work.'], bad: ['With one wheel there are only 26 start positions – easy to brute force if the wiring is known.', 'The pattern of substitutions repeats every 26 letters.', 'If the wheel is captured, only the start position is still secret.'], use: 'Rotor machines such as the German Enigma used three or more wheels, a reflector and a plugboard to give vastly more settings. Breaking Enigma at Bletchley Park helped lead to modern computing.' },
   steg: { good: ['Hides the fact that a message exists at all, so it does not attract attention.', 'Changes to colour values are too small to see.'], bad: ['If someone suspects it, the hidden bits are easy to extract – it should be combined with encryption.', 'Editing, resizing or compressing the image (e.g. saving as JPEG) can destroy the message.', 'Can be misused, e.g. to sneak data out of an organisation.'], use: 'Watermarking images and documents; hiding encrypted data; also used by malware to smuggle data.' }
 };
 function renderPanel() {
@@ -926,7 +930,8 @@ function calcQ() {
   if (t === 'otp') { const m = word.slice(0, 3), key = randomKey(3), ans = [...m].map((c, i) => A[(A.indexOf(c) + A.indexOf(key[i])) % 26]).join(''); return { text: `Encrypt <b>${m}</b> with the one-time pad key <b>${key}</b> (A = 0 … Z = 25, add, subtract 26 if needed).`, ans, why: [...m].map((c, i) => `${c}(${A.indexOf(c)}) + ${key[i]}(${A.indexOf(key[i])}) = ${A.indexOf(c) + A.indexOf(key[i])} → ${ans[i]}`).join('; ') + '.' }; }
   if (t === 'steg') { const v = rnd(0, 255), bit = rnd(0, 1); return { text: `Hide the bit <b>${bit}</b> in the colour value <code>${b8(v)}</code> using the least significant bit. Give the new 8-bit value.`, ans: b8((v & 0xFE) | bit), bin: true, why: 'Only the right-most bit is replaced.' }; }
   const k = rnd(1, 9); const ans = [...word].map(c => A[(A.indexOf(c) + k) % 26]).join('');
-  return { text: `Rotor machines are too complex to work by hand – instead, encrypt <b>${word}</b> with a Caesar shift of <b>${k}</b>, the simple substitution that rotor machines improved on.`, ans, why: `Each letter moves forward ${k} place${k === 1 ? "" : "s"}.` };
+  if (t === 'rotor') { const st = rnd(0, 25), n = rnd(2, 9), end = A[(st + n) % 26]; return { text: `A single rotor starts at <b>${A[st]}</b> and turns one place after every letter. Which letter does its window show after encrypting <b>${n}</b> letters?`, ans: end, why: `It turns ${n} places: ${A[st]} → ${end}${st + n > 25 ? ' (wrapping from Z back to A)' : ''}.` }; }
+  return { text: `Encrypt <b>${word}</b> with a Caesar shift of <b>${k}</b>.`, ans, why: `Each letter moves forward ${k} places.` };
 }
 function chalDock() {
   const sc = `<span class="score">Score ${chal.right} / ${chal.total}</span>`;
@@ -951,7 +956,7 @@ stage.addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.dir != null) { settings.dec = b.dataset.dir === '1'; save(); rebuild(false); return; }
   if (b.dataset.var) { S().variant = b.dataset.var; save(); rebuild(); return; }
-  if (b.dataset.rot != null) { const s = settings.rotor, p = (lettersOnly(s.start) + 'AAA').slice(0, 3).split(''); const r = +b.dataset.rot; p[r] = A[(A.indexOf(p[r]) + +b.dataset.d + 26) % 26]; s.start = p.join(''); save(); rebuild(false); return; }
+  if (b.dataset.rot != null) { const s = settings.rotor; s.start = A[(rotStart(s) + +b.dataset.d + 26) % 26]; save(); rebuild(false); return; }
   if (b.dataset.mv != null) { const pos = +b.dataset.mv, d = +b.dataset.d, o = chal.order; [o[pos], o[pos + d]] = [o[pos + d], o[pos]]; renderStage(); const nb = stage.querySelector(`[data-mv="${pos + d}"][data-d="${d}"]`); if (nb && !nb.disabled) nb.focus(); return; }
   const act = b.dataset.act;
   if (act === 'newkey') { settings.otp.key = randomKey(Math.max(20, lettersOnly(settings.otp.msg).length)); save(); rebuild(); }
@@ -1044,7 +1049,7 @@ const QUIZ = [
   { q: 'What is 1011 XOR 0110?', o: ['1101', '0010', '1111', '0110'], why: 'Different bits give 1, matching bits give 0.' },
   { q: 'Why does XOR with the same key decrypt the message?', o: ['XORing with the same value twice gives back the original', 'XOR reverses the order of the bits', 'The key is deleted after use', 'Binary is always symmetrical'], why: '(A XOR K) XOR K = A.' },
   { q: 'Which condition is NOT needed for a one-time pad to be unbreakable?', o: ['The key must be a dictionary word', 'The key must be truly random', 'The key must be at least as long as the message', 'The key must only be used once'], why: 'A dictionary word is not random – it would make the pad weak.' },
-  { q: 'Why was the Enigma machine harder to break than a simple substitution cipher?', o: ['The rotors turned after every letter, changing the substitution', 'It used binary', 'It hid messages in pictures', 'It had only 25 settings'], why: 'The same plaintext letter is encrypted differently each time.' },
+  { q: 'Why is a rotor cipher harder to break by frequency analysis than a Caesar cipher?', o: ['The rotor turns after every letter, so the same letter is encrypted differently each time', 'It uses binary', 'It hides the message in a picture', 'It has only 25 settings'], why: 'The same plaintext letter is encrypted differently each time.' },
   { q: 'What is the main purpose of steganography?', o: ['To hide the fact that a message exists', 'To make a message shorter', 'To check a message has not been changed', 'To share a key securely'], why: 'It hides a message inside something else, such as an image.' },
   { q: 'Why does changing the least significant bit of a colour value not change how an image looks?', o: ['It changes the value by at most 1 out of 255', 'It is the bit for transparency', 'The computer ignores that bit', 'It only changes the file name'], why: 'A difference of 1 in a colour value is invisible to the eye.' },
   { q: 'In a Caesar cipher algorithm, which instruction deals with going past Z?', o: ['If the count goes past Z, carry on from A', 'Input key/shift value', 'Record the ciphertext letter', 'Move on to the next letter'], why: 'This selection handles wrapping round the alphabet.' }
