@@ -15,6 +15,14 @@ Each simulation is a single self-contained HTML file with no external dependenci
 | `bitmap-builder.html` | Pixel editor with each pixel's binary code, colour depth and palettes, decode-the-binary challenges, resolution and colour depth effects on a picture, file-size calculations | 2.2.2, 2.2.4, 2.3.1 |
 | `logic-gates.html` | AND, OR and NOT: live circuits drawn from any expression with up to three inputs, truth tables with working columns, complete-the-table challenges, real-life problems | 1.3.1 |
 
+## BTEC National Computing – Unit 2: Computer Network Security and Encryption
+
+Simulations for the Pearson BTEC National in Computing (2025), Unit 2, are in the `btec-unit2/` folder. Algorithms are shown as numbered plain-English instructions, the style the mark schemes credit, and challenges use the specification's command words (Describe, Explain, Evaluate, Develop, Complete).
+
+| File | Topic | Spec |
+|---|---|---|
+| `btec-unit2/cipher-lab.html` | Substitution (Caesar and keyword), transposition (rail fence and columnar), XOR, one-time pad (and what goes wrong if a pad is reused), Enigma-style rotor cipher, LSB steganography; step-through algorithms, frequency analysis and brute force, strengths and weaknesses, put-the-algorithm-in-order challenges | C1.5.1 |
+
 ## Features shared by every simulation
 
 - **Revision mode**: an explanation panel with "How it works", "Key ideas" and a "Check yourself" quiz.
