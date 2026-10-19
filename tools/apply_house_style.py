@@ -13,7 +13,7 @@ import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SIMS = ['fde-cycle.html', 'binary-register.html', 'sort-search.html', 'trace-table.html', 'tcp-ip.html', 'sound-sampling.html']
+SIMS = ['fde-cycle.html', 'binary-register.html', 'sort-search.html', 'trace-table.html', 'tcp-ip.html', 'sound-sampling.html', 'bitmap-builder.html']
 
 FONTS = [  # (family, weight range, filename prefix)
     ('Atkinson Hyperlegible Next', '400 700', 'NaPNcYPdHfdVxJw0'),
@@ -129,7 +129,8 @@ def tip_classes(html):
 
 def no_italics(html):
     html = html.replace('<i>Instruction or data?</i>', '“Instruction or data?”')
-    return re.sub(r'</?i>', '', html)
+    # unwrap plain <i>…</i> pairs only, so other tags are never left unclosed
+    return re.sub(r'<i>(.*?)</i>', r'\1', html, flags=re.S)
 
 
 def apply(path, faces):
