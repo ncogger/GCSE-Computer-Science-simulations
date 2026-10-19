@@ -373,7 +373,7 @@ const settings = Object.assign({
   trans: { variant: 'rail', msg: 'WE ARE DISCOVERED FLEE AT ONCE', rails: 3, keyword: 'ZEBRA' },
   xor: { msg: 'HI BOB', key: 'KEY' },
   otp: { msg: 'ATTACK AT DAWN', key: '' },
-  rotor: { msg: 'MEET ME AT THE OLD BRIDGE', start: 'A' },
+  rotor: { msg: 'MEET ME AT THE OLD BRIDGE', start: 'A', start2: 'A', wheels: 1 },
   steg: { msg: 'MEET AT NOON' }
 }, store.get('cipherSim.v1', {}));
 const save = () => store.set('cipherSim.v1', settings);
@@ -402,6 +402,8 @@ const ALGO = {
 };
 ALGO['xor-dec'] = ALGO['xor-enc'].map((s, i) => i === 0 ? 'Input ciphertext (as binary)' : i === 2 ? 'Take the first 8 bits of the ciphertext' : s);
 ALGO['rotor-dec'] = ['Input ciphertext', 'Set the rotor to the same starting position used to encrypt', 'Take the first letter', 'Find the letter on the output side of the rotor', 'Follow the wiring backwards to find the input letter', 'Record the plaintext letter', 'Turn the rotor on one place', 'Move on to the next letter', 'If there are no more letters, stop', 'Otherwise go back to instruction 4'];
+ALGO['rotor2-enc'] = ['Input message', 'Set the starting position of each wheel', 'Take the first letter', 'Find the letter on the input ring', 'Follow the wiring of wheel 1 to get a new letter', 'Follow the wiring of wheel 2 to get the output letter', 'Record the output letter', 'Turn wheel 1 on one place; if it has just gone from Z back to A, turn wheel 2 on one place too', 'Move on to the next letter', 'If there are no more letters, stop', 'Otherwise go back to instruction 4'];
+ALGO['rotor2-dec'] = ['Input ciphertext', 'Set each wheel to the same starting position used to encrypt', 'Take the first letter', 'Find the letter on the output side of wheel 2', 'Follow the wiring of wheel 2 backwards to get a new letter', 'Follow the wiring of wheel 1 backwards to get the plaintext letter', 'Record the plaintext letter', 'Turn wheel 1 on one place; if it has just gone from Z back to A, turn wheel 2 on one place too', 'Move on to the next letter', 'If there are no more letters, stop', 'Otherwise go back to instruction 4'];
 
 function traceSub(s, dec) {
   const v = s.variant, msg = s.msg.toUpperCase(), steps = [], shift = ((+s.shift % 26) + 26) % 26;
@@ -656,56 +658,93 @@ function reuseDemo(s) {
     <p>…and then decrypt the second message: <code>${c2}</code> − key = <b><code>${m2r}</code></b>. That is why the key must only ever be used <b>once</b>.</p></details>`;
 }
 
-/* ---------- 5. rotor (single wheel) ---------- */
-const WHEEL = 'EKMFLGDQVZNTOWYHXUSPAIBRCJ'; /* wired like rotor I of the Enigma machine */
-const rotStart = s => A.indexOf((lettersOnly(s.start) + 'A')[0]);
-const rotEnc = (m, p) => (A.indexOf(WHEEL[(m + p) % 26]) - p + 26) % 26;
-const rotDec = (c, p) => (WHEEL.indexOf(A[(c + p) % 26]) - p + 26) % 26;
-const wiringAt = p => A.split('').map((_, m) => A[rotEnc(m, p)]).join('');
-function rotorRun(msg, start, dec) { let p = start, out = ''; for (const ch of msg) { const k = A.indexOf(ch); out += A[dec ? rotDec(k, p) : rotEnc(k, p)]; p = (p + 1) % 26; } return out; }
-function traceRotor(s, dec) {
-  const msg = lettersOnly(s.msg), start = rotStart(s), steps = [];
-  let p = start, out = '';
-  const push = (line, note, x) => steps.push(Object.assign({ line: [].concat(line), note, msg, out, pos: p, start, from: -1, to: -1 }, x));
-  push(1, `Input the ${dec ? 'ciphertext' : 'message'}: <code>${msg}</code>.`, { i: -1 });
-  push(2, `Set the rotor so its window shows <b>${A[start]}</b>. ${dec ? 'It must be the same start position that was used to encrypt.' : 'The start position is the key.'}`, { i: -1 });
-  for (let i = 0; i < msg.length; i++) {
-    const k = A.indexOf(msg[i]), o = dec ? rotDec(k, p) : rotEnc(k, p);
-    if (i === 0) push(3, `First letter: <b>${msg[0]}</b>.`, { i });
-    push(4, dec ? `Find <b>${msg[i]}</b> on the output side of the rotor.` : `Find <b>${msg[i]}</b> on the input ring.`, { i, from: dec ? o : k, to: -1, hlOut: dec });
-    push(5, dec ? `Follow the wiring backwards: <b>${msg[i]}</b> came from <b>${A[o]}</b>.` : `Follow the wiring: <b>${msg[i]}</b> → <b>${A[o]}</b>.`, { i, from: dec ? o : k, to: dec ? o : k, both: true });
-    out += A[o];
-    push(6, `Record <b>${A[o]}</b>.`, { i, from: dec ? o : k, to: dec ? o : k, both: true });
-    p = (p + 1) % 26;
-    push(7, `The rotor turns one place: its window now shows <b>${A[p]}</b>, so every letter is now wired to something different.`, { i, turned: true });
-    if (i < msg.length - 1) push([8, 10], `Move on to the next letter, <b>${msg[i + 1]}</b>, and go back to instruction 4.`, { i: i + 1 });
-    else push(8, 'That was the last letter.', { i });
+/* ---------- 5. rotor (one or two wheels) ---------- */
+const WHEELS = ['EKMFLGDQVZNTOWYHXUSPAIBRCJ', 'AJDKSIRUXBLHWTMCQGZNPYFVOE']; /* wired like rotors I and II of the Enigma machine */
+const letterIdx = v => A.indexOf((lettersOnly(v) + 'A')[0]);
+const rotStart = s => letterIdx(s.start);
+const nWheels = s => (+s.wheels === 2 ? 2 : 1);
+const wEnc = (w, m, p) => (A.indexOf(WHEELS[w][(m + p) % 26]) - p + 26) % 26;
+const wDec = (w, c, p) => (WHEELS[w].indexOf(A[(c + p) % 26]) - p + 26) % 26;
+const wiringAt = (w, p) => A.split('').map((_, m) => A[wEnc(w, m, p)]).join('');
+/* p = [wheel 1 (fast), wheel 2 (slow)] */
+function rotorRun(msg, p0, n, dec) {
+  const p = p0.slice(); let out = '';
+  for (const ch of msg) {
+    const k = A.indexOf(ch);
+    if (!dec) { const x = wEnc(0, k, p[0]); out += A[n === 2 ? wEnc(1, x, p[1]) : x]; }
+    else { const x = n === 2 ? wDec(1, k, p[1]) : k; out += A[wDec(0, x, p[0])]; }
+    p[0] = (p[0] + 1) % 26; if (n === 2 && p[0] === 0) p[1] = (p[1] + 1) % 26;
   }
-  push(9, `No more letters. ${dec ? 'Plaintext' : 'Ciphertext'}: <b>${out}</b>. Notice the repeated letters in the message did not always give the same output.`, { i: -1, done: true });
+  return out;
+}
+function traceRotor(s, dec) {
+  const msg = lettersOnly(s.msg), n = nWheels(s), start = [rotStart(s), letterIdx(s.start2)], steps = [];
+  const L = n === 1 ? { find: 4, a: 5, rec: 6, turn: 7, next: [8, 10], last: 8, end: 9 } : { find: 4, a: 5, b: 6, rec: 7, turn: 8, next: [9, 11], last: 9, end: 10 };
+  const p = start.slice(); let out = '';
+  const push = (line, note, x) => steps.push(Object.assign({ line: [].concat(line), note, msg, out, pos: p.slice(), start, n, hl: [] }, x));
+  push(1, `Input the ${dec ? 'ciphertext' : 'message'}: <code>${msg}</code>.`, { i: -1 });
+  push(2, n === 1 ? `Set the rotor so its window shows <b>${A[start[0]]}</b>. ${dec ? 'It must be the same start position that was used to encrypt.' : 'The start position is the key.'}` : `Set wheel 2 to <b>${A[start[1]]}</b> and wheel 1 to <b>${A[start[0]]}</b>. ${dec ? 'They must match the start positions used to encrypt.' : 'Both start positions together are the key.'}`, { i: -1 });
+  for (let i = 0; i < msg.length; i++) {
+    const k = A.indexOf(msg[i]);
+    let x, o;
+    if (!dec) { x = wEnc(0, k, p[0]); o = n === 2 ? wEnc(1, x, p[1]) : x; } else { x = n === 2 ? wDec(1, k, p[1]) : k; o = wDec(0, x, p[0]); }
+    /* hl: per wheel { col, fwd, phase } – phase 1 = source only, 2 = source and result */
+    const h1 = ph => dec ? { w: 0, col: o, fwd: false, ph } : { w: 0, col: k, fwd: true, ph };
+    const h2 = ph => dec ? { w: 1, col: x, fwd: false, ph } : { w: 1, col: x, fwd: true, ph };
+    if (i === 0) push(3, `First letter: <b>${msg[0]}</b>.`, { i });
+    if (n === 1) {
+      push(L.find, dec ? `Find <b>${msg[i]}</b> on the output side of the rotor.` : `Find <b>${msg[i]}</b> on the input ring.`, { i, hl: [h1(1)] });
+      push(L.a, dec ? `Follow the wiring backwards: <b>${msg[i]}</b> came from <b>${A[o]}</b>.` : `Follow the wiring: <b>${msg[i]}</b> → <b>${A[o]}</b>.`, { i, hl: [h1(2)] });
+    } else if (!dec) {
+      push(L.find, `Find <b>${msg[i]}</b> on the input ring of wheel 1.`, { i, hl: [h1(1)] });
+      push(L.a, `Wheel 1’s wiring turns <b>${msg[i]}</b> into <b>${A[x]}</b>.`, { i, hl: [h1(2)] });
+      push(L.b, `Wheel 2’s wiring turns <b>${A[x]}</b> into <b>${A[o]}</b>.`, { i, hl: [h1(2), h2(2)] });
+    } else {
+      push(L.find, `Find <b>${msg[i]}</b> on the output side of wheel 2.`, { i, hl: [h2(1)] });
+      push(L.a, `Back through wheel 2: <b>${msg[i]}</b> came from <b>${A[x]}</b>.`, { i, hl: [h2(2)] });
+      push(L.b, `Back through wheel 1: <b>${A[x]}</b> came from <b>${A[o]}</b>.`, { i, hl: [h2(2), h1(2)] });
+    }
+    out += A[o];
+    push(L.rec, `Record <b>${A[o]}</b>.`, { i, hl: n === 1 ? [h1(2)] : [h1(2), h2(2)] });
+    p[0] = (p[0] + 1) % 26;
+    const carry = n === 2 && p[0] === 0;
+    if (carry) p[1] = (p[1] + 1) % 26;
+    push(L.turn, n === 1 ? `The rotor turns one place: its window now shows <b>${A[p[0]]}</b>, so every letter is now wired to something different.` : carry ? `Wheel 1 turns from Z back to <b>A</b> – a full turn – so <b>wheel 2 turns one place too</b>, to <b>${A[p[1]]}</b>. Like a car’s mileage counter rolling over.` : `Wheel 1 turns one place, to <b>${A[p[0]]}</b>. Wheel 2 stays at ${A[p[1]]} until wheel 1 has gone all the way round.`, { i, turned: carry ? [0, 1] : [0] });
+    if (i < msg.length - 1) push(L.next, `Move on to the next letter, <b>${msg[i + 1]}</b>, and go back to instruction 4.`, { i: i + 1 });
+    else push(L.last, 'That was the last letter.', { i });
+  }
+  push(L.end, `No more letters. ${dec ? 'Plaintext' : 'Ciphertext'}: <b>${out}</b>. Notice the repeated letters in the message did not always give the same output.`, { i: -1, done: true });
   return steps;
 }
+function wiringStrip(w, pos, h, label) {
+  const map = wiringAt(w, pos);
+  const inC = k => `<div class="c${h && h.col === k ? (h.fwd ? ' src' : h.ph === 2 ? ' hi' : '') : ''}">${A[k]}</div>`;
+  const outC = k => `<div class="c${h && h.col === k ? (h.fwd ? (h.ph === 2 ? ' hi' : '') : ' src') : ''}">${map[k]}</div>`;
+  return `<div class="lbl" style="margin-top:.6rem">${label} – wiring at position ${A[pos]}</div>
+    <div class="alpha"><div class="h">In</div>${A.split('').map((_, k) => inC(k)).join('')}<div class="h">Out</div>${A.split('').map((_, k) => outC(k)).join('')}</div>`;
+}
 function renderRotor(st, s, dec) {
-  const map = wiringAt(st.pos);
-  const inCell = k => `<div class="c${st.from === k && !st.hlOut ? ' src' : ''}${st.both && st.from === k && dec ? ' hi' : ''}">${A[k]}</div>`;
-  const outCell = k => `<div class="c${st.from === k && st.hlOut ? ' src' : ''}${st.both && st.to === k && !dec ? ' hi' : ''}${st.both && st.from === k && dec ? ' src' : ''}">${map[k]}</div>`;
-  let h = `<div class="lbl">${dec ? 'Ciphertext' : 'Message'}</div>${strip(st.msg, st.i, st.done)}
-    <div class="rotorrow">
-      <div class="rotor"><div class="nm">Start position</div><div class="setw">${A[st.start]}</div><div class="ud"><button class="btn small" data-rot="0" data-d="-1" aria-label="Start position back">−</button><button class="btn small" data-rot="0" data-d="1" aria-label="Start position forward">+</button></div></div>
-      <div class="rotor"><div class="nm">Rotor window now</div><div class="win${st.turned ? ' turned' : ''}">${A[st.pos]}</div><div class="nm">${st.turned ? '↻ turned' : '&nbsp;'}</div></div>
-      <div class="how">The wheel’s wiring swaps every letter for another. After each letter the wheel turns one place, so the swaps change.</div>
-    </div>
-    <div class="lbl" style="margin-top:.7rem">The rotor’s wiring at position ${A[st.pos]}</div>
-    <div class="alpha"><div class="h">Input</div>${A.split('').map((_, k) => inCell(k)).join('')}<div class="h">Output</div>${A.split('').map((_, k) => outCell(k)).join('')}</div>
-    <div class="lbl" style="margin-top:.7rem">${dec ? 'Plaintext' : 'Ciphertext'}</div><div class="out">${esc(st.out)}</div>`;
-  // brute force: only 26 starting positions
-  const ct = dec ? st.msg : rotorRun(st.msg, st.start, false);
+  const n = st.n, turned = st.turned || [], H = w => st.hl.find(x => x.w === w);
+  const setter = (w, nm) => `<div class="rotor"><div class="nm">${nm}</div><div class="setw">${A[st.start[w]]}</div><div class="ud"><button class="btn small" data-rot="${w}" data-d="-1" aria-label="${nm} back">−</button><button class="btn small" data-rot="${w}" data-d="1" aria-label="${nm} forward">+</button></div></div>`;
+  const win = (w, nm) => `<div class="rotor"><div class="nm">${nm}</div><div class="win${turned.includes(w) ? ' turned' : ''}">${A[st.pos[w]]}</div><div class="nm">${turned.includes(w) ? '↻ turned' : '&nbsp;'}</div></div>`;
+  let h = `<div class="lbl">${dec ? 'Ciphertext' : 'Message'}</div>${strip(st.msg, st.i, st.done)}`;
+  if (n === 1) h += `<div class="rotorrow">${setter(0, 'Start position')}${win(0, 'Rotor window now')}<div class="how">The wheel’s wiring swaps every letter for another. After each letter the wheel turns one place, so the swaps change.</div></div>${wiringStrip(0, st.pos[0], H(0), 'The rotor')}`;
+  else h += `<div class="rotorrow"><div><div class="lbl">Start positions</div><div style="display:flex;gap:.6rem">${setter(1, 'Wheel 2')}${setter(0, 'Wheel 1')}</div></div>
+      <div><div class="lbl">Windows now</div><div style="display:flex;gap:.6rem">${win(1, 'Wheel 2 (slow)')}${win(0, 'Wheel 1 (fast)')}</div></div>
+      <div class="how">Each letter goes through wheel 1, then wheel 2. Wheel 1 turns after every letter; wheel 2 turns once each time wheel 1 completes a full turn.</div></div>
+    ${dec ? wiringStrip(1, st.pos[1], H(1), 'Wheel 2') + wiringStrip(0, st.pos[0], H(0), 'Wheel 1') : wiringStrip(0, st.pos[0], H(0), 'Wheel 1') + wiringStrip(1, st.pos[1], H(1), 'Wheel 2')}`;
+  h += `<div class="lbl" style="margin-top:.7rem">${dec ? 'Plaintext' : 'Ciphertext'}</div><div class="out">${esc(st.out)}</div>`;
+  // brute force over every start position
+  const ct = dec ? st.msg : rotorRun(st.msg, st.start, n, false);
   if (ct) {
-    const tries = A.split('').map((_, k) => { const d = rotorRun(ct, k, true); return { k, d, x: chi(d) }; });
-    const best = tries.reduce((a, b) => a.x < b.x ? a : b);
+    const tries = [];
+    for (let a = 0; a < 26; a++) for (let b = 0; b < (n === 2 ? 26 : 1); b++) { const d = rotorRun(ct, [a, b], n, true); tries.push({ a, b, d, x: chi(d) }); }
+    const name = t => n === 2 ? `${A[t.b]}${A[t.a]}` : A[t.a];
+    const sorted = tries.slice().sort((p, q) => p.x - q.x), show = n === 2 ? sorted.slice(0, 8) : tries, best = sorted[0];
     h += `<details class="card rev-only" style="margin-top:.7rem" id="crack" ${settings.crackOpen ? 'open' : ''}><summary><b>Crack it: try every start position</b></summary>
-      <p style="margin:.3rem 0">If an attacker knows how the wheel is wired, there are only <b>26</b> possible start positions. A computer tries them all instantly; the most English-looking result is highlighted. (On very short messages the computer’s best guess can be wrong, so a person checks the top few.)</p>
-      <div class="brute">${tries.map(t => `<div class="${t === best ? 'best' : ''}">start ${A[t.k]}: ${esc(t.d.slice(0, 40))}</div>`).join('')}</div>
-      <p style="margin:.4rem 0 0">The Enigma machine used three wheels chosen from five, a reflector and a plugboard, giving about 159 million million million settings – far too many to try by hand.</p></details>`;
+      <p style="margin:.3rem 0">If an attacker knows how the wheel${n === 2 ? 's are' : ' is'} wired, there ${n === 2 ? 'are 26 × 26 = <b>676</b> possible start positions' : 'are only <b>26</b> possible start positions'}. A computer tries them all instantly; ${n === 2 ? 'the 8 most English-looking results are shown, best first' : 'the most English-looking result is highlighted'}. (On very short messages the computer’s best guess can be wrong, so a person checks the top few.)</p>
+      <div class="brute">${show.map(t => `<div class="${t === best ? 'best' : ''}">start ${name(t)}: ${esc(t.d.slice(0, 40))}</div>`).join('')}</div>
+      <p style="margin:.4rem 0 0">${n === 2 ? 'A second wheel multiplied the start positions by 26 – but 676 is still nothing for a computer. ' : 'Adding more wheels multiplies the number of start positions by 26 each time. '}The Enigma machine used three wheels chosen from five, a reflector and a plugboard, giving about 159 million million million settings.</p></details>`;
   }
   return h;
 }
@@ -792,7 +831,7 @@ const RENDER = { sub: renderSub, trans: renderTrans, xor: renderXor, otp: render
 const SPEEDS = [1, 2, 4, 8, 15];
 let steps = [], idx = 0, runTimer = null;
 const T = () => settings.tool, S = () => settings[T()], dec = () => settings.dec;
-function algoKey() { const t = T(), s = S(); return t === 'sub' ? `sub-${s.variant}-${dec() ? 'dec' : 'enc'}` : t === 'trans' ? `trans-${s.variant}-${dec() ? 'dec' : 'enc'}` : `${t}-${dec() ? 'dec' : 'enc'}`; }
+function algoKey() { const t = T(), s = S(); if (t === 'rotor' && +s.wheels === 2) return `rotor2-${dec() ? 'dec' : 'enc'}`; return t === 'sub' ? `sub-${s.variant}-${dec() ? 'dec' : 'enc'}` : t === 'trans' ? `trans-${s.variant}-${dec() ? 'dec' : 'enc'}` : `${t}-${dec() ? 'dec' : 'enc'}`; }
 function rebuild(toEnd = true) {
   stopRun();
   if (T() === 'otp' && !lettersOnly(settings.otp.key)) { settings.otp.key = randomKey(Math.max(20, lettersOnly(settings.otp.msg).length)); save(); }
@@ -820,7 +859,7 @@ const INFO = {
   trans: { title: 'Transposition cipher', sub: 'The letters stay the same but are moved to different positions. Rail fence writes them in a zigzag; columnar writes them in a grid and reads the columns in keyword order.' },
   xor: { title: 'XOR cipher', sub: 'Each character is turned into binary and combined with the key using XOR. Doing exactly the same thing again with the same key gives the original back.' },
   otp: { title: 'One-time pad', sub: 'A truly random key, as long as the message, is added letter by letter. Used correctly it is unbreakable – but the key must never be reused.' },
-  rotor: { title: 'Rotor cipher (single wheel)', sub: 'A wheel with scrambled wiring swaps each letter for another, then turns one place – so the substitution changes after every letter.' },
+  rotor: { title: 'Rotor cipher', sub: 'A wheel with scrambled wiring swaps each letter for another, then turns one place – so the substitution changes after every letter. Add a second wheel to see how rotor machines multiply the possibilities.' },
   steg: { title: 'Steganography', sub: 'Instead of scrambling the message, it is hidden inside something else – here, in the least significant bits of an image’s colour values.' }
 };
 function inputsHTML() {
@@ -836,7 +875,7 @@ function inputsHTML() {
   if (t === 'trans' && s.variant === 'col') h += `<label class="field">Keyword <input class="inp" data-k="keyword" value="${esc(s.keyword)}" style="width:9rem"></label>`;
   if (t === 'xor') h += `<label class="field">Key <input class="inp" data-k="key" value="${esc(s.key)}" style="width:8rem"></label>`;
   if (t === 'otp') h += `<label class="field">Key <input class="inp" data-k="key" value="${esc(s.key)}" style="width:14rem"></label><button class="btn small" data-act="newkey">New random key</button>`;
-  if (t === 'rotor') h += `<label class="field">Start <input class="inp" data-k="start" value="${esc(A[rotStart(s)])}" maxlength="1" style="width:3.2rem"></label>`;
+  if (t === 'rotor') h += `<span class="seg" role="group" aria-label="Number of wheels"><button data-wheels="1" aria-pressed="${nWheels(s) === 1}">1 wheel</button><button data-wheels="2" aria-pressed="${nWheels(s) === 2}">2 wheels</button></span>` + (nWheels(s) === 2 ? `<label class="field">Wheel 2 start <input class="inp" data-k="start2" value="${esc(A[letterIdx(s.start2)])}" maxlength="1" style="width:3.2rem"></label><label class="field">Wheel 1 start <input class="inp" data-k="start" value="${esc(A[rotStart(s)])}" maxlength="1" style="width:3.2rem"></label>` : `<label class="field">Start <input class="inp" data-k="start" value="${esc(A[rotStart(s)])}" maxlength="1" style="width:3.2rem"></label>`);
   if (dec() && t !== 'steg') h += `<button class="btn small" data-act="useout" title="Use the ciphertext you made when encrypting">Use my ciphertext</button>`;
   return h + '</div>';
 }
@@ -890,7 +929,7 @@ const EVAL = {
   trans: { good: ['Letter frequencies look exactly like English, which can mislead a codebreaker.', 'Easy to combine with a substitution cipher for extra strength.'], bad: ['The letters themselves are unchanged, so anagram-solving techniques can recover the message.', 'Few possible keys for a small number of rails.'], use: 'Historically combined with substitution (e.g. in the First World War). Modern ciphers such as AES still use permutation steps.' },
   xor: { good: ['Very fast for computers – a single operation on each bit.', 'The same operation encrypts and decrypts.', 'XOR is a building block of modern ciphers, including AES and stream ciphers.'], bad: ['A short repeating key creates patterns that can be found and broken.', 'If an attacker knows part of the plaintext, XOR with the ciphertext reveals that part of the key.'], use: 'As one step inside stronger algorithms, and in one-time pads when the key is truly random.' },
   otp: { good: ['<b>Perfectly secure</b> when the key is truly random, at least as long as the message, kept secret and used only once.'], bad: ['The key is as long as the message, so huge keys must be shared securely in advance.', 'Reusing the key even once lets an attacker recover the messages.', 'Truly random keys are hard to generate in large amounts.'], use: 'Very high-security links, such as diplomatic or military hotlines, where keys can be delivered in person.' },
-  rotor: { good: ['The substitution changes after every letter, so the same letter is encrypted differently each time.', 'Letter frequencies are flattened out, so simple frequency analysis does not work.'], bad: ['With one wheel there are only 26 start positions – easy to brute force if the wiring is known.', 'The pattern of substitutions repeats every 26 letters.', 'If the wheel is captured, only the start position is still secret.'], use: 'Rotor machines such as the German Enigma used three or more wheels, a reflector and a plugboard to give vastly more settings. Breaking Enigma at Bletchley Park helped lead to modern computing.' },
+  rotor: { good: ['The substitution changes after every letter, so the same letter is encrypted differently each time.', 'Letter frequencies are flattened out, so simple frequency analysis does not work.', 'Each extra wheel multiplies the start positions by 26, and the pattern takes much longer to repeat (676 letters with two wheels).'], bad: ['With one wheel there are only 26 start positions, and with two only 676 – easy to brute force if the wiring is known.', 'The pattern of substitutions eventually repeats.', 'If the wheels are captured, only the start positions are still secret.'], use: 'Rotor machines such as the German Enigma used three or more wheels, a reflector and a plugboard to give vastly more settings. Breaking Enigma at Bletchley Park helped lead to modern computing.' },
   steg: { good: ['Hides the fact that a message exists at all, so it does not attract attention.', 'Changes to colour values are too small to see.'], bad: ['If someone suspects it, the hidden bits are easy to extract – it should be combined with encryption.', 'Editing, resizing or compressing the image (e.g. saving as JPEG) can destroy the message.', 'Can be misused, e.g. to sneak data out of an organisation.'], use: 'Watermarking images and documents; hiding encrypted data; also used by malware to smuggle data.' }
 };
 function renderPanel() {
@@ -930,6 +969,7 @@ function calcQ() {
   if (t === 'otp') { const m = word.slice(0, 3), key = randomKey(3), ans = [...m].map((c, i) => A[(A.indexOf(c) + A.indexOf(key[i])) % 26]).join(''); return { text: `Encrypt <b>${m}</b> with the one-time pad key <b>${key}</b> (A = 0 … Z = 25, add, subtract 26 if needed).`, ans, why: [...m].map((c, i) => `${c}(${A.indexOf(c)}) + ${key[i]}(${A.indexOf(key[i])}) = ${A.indexOf(c) + A.indexOf(key[i])} → ${ans[i]}`).join('; ') + '.' }; }
   if (t === 'steg') { const v = rnd(0, 255), bit = rnd(0, 1); return { text: `Hide the bit <b>${bit}</b> in the colour value <code>${b8(v)}</code> using the least significant bit. Give the new 8-bit value.`, ans: b8((v & 0xFE) | bit), bin: true, why: 'Only the right-most bit is replaced.' }; }
   const k = rnd(1, 9); const ans = [...word].map(c => A[(A.indexOf(c) + k) % 26]).join('');
+  if (t === 'rotor' && nWheels(S()) === 2) { const a = rnd(18, 25), b = rnd(0, 24), n = rnd(3, 9), p1 = (a + n) % 26, p2 = (b + (a + n >= 26 ? 1 : 0)) % 26; return { text: `Two wheels: wheel 2 starts at <b>${A[b]}</b> and wheel 1 at <b>${A[a]}</b>. Wheel 1 turns after every letter; wheel 2 turns when wheel 1 goes from Z to A. After <b>${n}</b> letters, what do the windows show? Type wheel 2 then wheel 1, e.g. ${A[b]}${A[a]}.`, ans: A[p2] + A[p1], why: `Wheel 1 turns ${n} places: ${A[a]} → ${A[p1]}.${a + n >= 26 ? ` On the way it goes from Z to A, so wheel 2 turns once: ${A[b]} → ${A[p2]}.` : ' It never passes Z, so wheel 2 stays put.'}` }; }
   if (t === 'rotor') { const st = rnd(0, 25), n = rnd(2, 9), end = A[(st + n) % 26]; return { text: `A single rotor starts at <b>${A[st]}</b> and turns one place after every letter. Which letter does its window show after encrypting <b>${n}</b> letters?`, ans: end, why: `It turns ${n} places: ${A[st]} → ${end}${st + n > 25 ? ' (wrapping from Z back to A)' : ''}.` }; }
   return { text: `Encrypt <b>${word}</b> with a Caesar shift of <b>${k}</b>.`, ans, why: `Each letter moves forward ${k} places.` };
 }
@@ -956,7 +996,8 @@ stage.addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.dir != null) { settings.dec = b.dataset.dir === '1'; save(); rebuild(false); return; }
   if (b.dataset.var) { S().variant = b.dataset.var; save(); rebuild(); return; }
-  if (b.dataset.rot != null) { const s = settings.rotor; s.start = A[(rotStart(s) + +b.dataset.d + 26) % 26]; save(); rebuild(false); return; }
+  if (b.dataset.rot != null) { const s = settings.rotor, key = b.dataset.rot === '1' ? 'start2' : 'start'; s[key] = A[(letterIdx(s[key]) + +b.dataset.d + 26) % 26]; save(); rebuild(false); return; }
+  if (b.dataset.wheels) { const s = settings.rotor, n = +b.dataset.wheels; if (n !== nWheels(s)) { s.wheels = n; if (n === 2) { s.start = 'W'; s.start2 = 'A'; } } save(); rebuild(false); return; }
   if (b.dataset.mv != null) { const pos = +b.dataset.mv, d = +b.dataset.d, o = chal.order; [o[pos], o[pos + d]] = [o[pos + d], o[pos]]; renderStage(); const nb = stage.querySelector(`[data-mv="${pos + d}"][data-d="${d}"]`); if (nb && !nb.disabled) nb.focus(); return; }
   const act = b.dataset.act;
   if (act === 'newkey') { settings.otp.key = randomKey(Math.max(20, lettersOnly(settings.otp.msg).length)); save(); rebuild(); }
@@ -974,7 +1015,7 @@ stage.addEventListener('change', e => {
   let v = e.target.value;
   if (k === 'shift') v = Math.max(1, Math.min(25, Math.round(+v) || 1));
   if (k === 'rails') v = Math.max(2, Math.min(6, Math.round(+v) || 3));
-  S()[k] = v; save(); rebuild(k !== 'start');
+  S()[k] = v; save(); rebuild(k !== 'start' && k !== 'start2');
 });
 stage.addEventListener('toggle', e => { if (e.target.id === 'crack') settings.crackOpen = e.target.open; }, true);
 stage.addEventListener('keydown', e => { if (e.target.dataset && e.target.dataset.k && e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
